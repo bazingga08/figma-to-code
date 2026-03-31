@@ -632,6 +632,114 @@ screenshot. Keep iterating until it does (up to 5 times).
 
 ---
 
+## Phase 3.5 — Full-Page Assembly Comparison (non-negotiable)
+
+**After ALL per-component builds are done, BEFORE moving to production hardening,
+do a full-page-level visual comparison and iterate.**
+
+This phase exists because per-component verification alone misses:
+- **Inter-section spacing**: gaps between sections often drift from spec
+- **Missing structural elements**: tab bars, dividers, decorative layers that
+  aren't "components" but are part of the assembly tree
+- **Scroll/flow issues**: sections that looked fine in isolation don't flow
+  correctly when composed
+- **Assembly spec gaps**: the top-level assembly chunk specifies gap, padding,
+  and child order that can get lost when composing manually
+
+### Step 1: Read the Assembly Spec
+
+Read the **root assembly chunk** (usually the last chunk, e.g., `044-futures-home.md`).
+This tells you:
+- **Direction**: how children are stacked (VERTICAL for most screens)
+- **Gap**: the gap between direct children (this is the section-to-section spacing)
+- **Padding**: the outer padding of the whole page
+- **Child Chunks**: the exact order sections should appear
+
+Also read the **parent assembly chunks** (e.g., `040-frame-xxx.md`) — these
+are intermediate containers that group sections. Their `gap` values are the
+**inter-section gaps** between components like quick actions → announcements.
+
+**Common miss**: the assembly spec might say `gap: 24px` between sections,
+but the code uses mixed values (12px, 16px, 24px). Standardize to match.
+
+### Step 2: Full-Screen Visual Comparison
+
+Read `screenshots/full-screen.png` and your built full-screen screenshot side
+by side. Go through the page **top to bottom**, checking:
+
+```
+For EACH section boundary (where one section ends and the next begins):
+□ Gap between sections matches assembly spec exactly
+□ No missing structural elements (tab bars, dividers, separators)
+□ Section order matches the assembly child chunk order
+□ Background colors transition correctly between sections
+
+For EACH section:
+□ Horizontal padding matches (usually 16px from screen edge)
+□ Section header alignment (left-aligned text, right-aligned actions)
+□ Internal component spacing matches per-component spec
+□ Scroll direction correct (horizontal lists, vertical main scroll)
+
+For the FULL page:
+□ Overall page background color correct
+□ Fixed elements (header, bottom nav) are actually fixed, not scrolling
+□ Scroll content doesn't overflow under fixed elements
+□ No missing sections — compare section count in Figma vs code
+```
+
+### Step 3: Build the Structured Page-Level Diff
+
+Create a section-by-section diff. For each section top-to-bottom:
+
+```
+SECTION: Header
+MATCH:    height 40px ✓
+MATCH:    left chevron + Exit PRO ✓
+MISMATCH: hamburger icon should be SVG, using Material Icon → fix
+
+SPACING: Header → P&L = 0px (flush) ✓
+
+SECTION: P&L
+MATCH:    gradient background ✓
+MISMATCH: outer padding should be 0/0, not 20px horizontal → fix
+
+SPACING: P&L → Explore Tab = 0px (per assembly gap)
+MISSING:  Explore/Strategies tab bar not present → ADD
+
+SPACING: Explore Tab → Quick Actions = 0px
+...continue for every section...
+
+SECTION: Bottom Nav
+MATCH:    fixed at bottom ✓
+MISMATCH: Futures selector missing angled polygon shape → fix
+```
+
+### Step 4: Fix All Page-Level Mismatches
+
+Apply fixes in this priority order:
+1. **Missing elements** — add any structural components (tab bars, dividers,
+   decorative elements) that exist in Figma but are absent in code
+2. **Section spacing** — standardize all section gaps to match assembly spec
+3. **Layout structure** — fix scroll vs fixed, padding, alignment
+4. **Visual polish** — backgrounds, borders, transitions between sections
+
+### Step 5: Re-verify Full Page
+
+After fixes, re-capture full-screen screenshot and compare again.
+Repeat Steps 2-4 until the page flow matches Figma at the macro level.
+
+**Max 3 page-level iterations.** If issues remain after 3, list them for the user.
+
+### Why This Phase Matters
+
+Per-component builds at 90-95% match can still produce a full page that looks
+50% wrong — because spacing, missing elements, and composition errors compound.
+A 5-minute page-level check catches problems that would otherwise require a
+complete rebuild. This phase is the difference between "components look right
+in isolation" and "the screen looks right as a whole."
+
+---
+
 ## Phase 4 — Rules & Guardrails
 
 ### Asset Rule (absolute, no exceptions)
