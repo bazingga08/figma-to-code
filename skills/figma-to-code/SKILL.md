@@ -99,7 +99,14 @@ After building each component, capture a screenshot and compare it to the
 Figma screenshot. Generate a structured diff. Fix mismatches. Re-verify.
 Never mark a component as done without visual verification.
 
-### 5. Think Like a Principal Engineer
+### 5. Read Top-Down, Build Bottom-Up
+Read the FULL design top-down first — screen → sections → components → leaves.
+Understand the complete context, relationships, and semantic patterns.
+Then BUILD bottom-up — smallest leaves first, verify each one, assemble
+upward. Each buildable unit ≤ 10K tokens. If too big, drill deeper until
+it fits. This ensures full precision at every level — errors don't compound.
+
+### 6. Think Like a Principal Engineer
 The design shows the happy path at one screen size. Production code handles:
 - Every screen size (320px → tablet)
 - Every state (loading, error, empty, full)
@@ -213,11 +220,82 @@ components only. Never use MCP for the full design fetch.
 
 ## Phase 2 — Top-Down Reading (Understand First, Build Nothing)
 
-1. Read `.figma-extract/blueprint.md` — understand the complete structure
-2. Review the **Build Order** — this is the sequence you'll follow
-3. Review **Reusable Components** — these get built first, reused everywhere
-4. Review **Design Tokens** — map extracted colors/fonts to project's existing tokens
-5. Review **Assets** — confirm icons and images are exported
+**READ TOP-DOWN. The entire design must be understood before a single line of code.**
+
+This is where you build the FULL mental model of the design. You read from the
+top of the tree to the bottom — screen → sections → components → leaf elements.
+By the time you finish Phase 2, you know:
+- What every section IS (semantic pattern)
+- How every section CONNECTS to its siblings
+- What the page FLOW looks like
+- Where dividers, gaps, and visual rhythm exist
+- What scrolls, what's fixed, what overlaps
+- What's dynamic data vs static labels
+
+### Step 1: Read the Blueprint
+
+1. Read `.figma-extract/blueprint.md` — understand the complete tree structure
+2. Read the **full-screen screenshot** (`screenshots/full-screen.png`) to visually
+   understand what the whole page looks like
+3. Review the **Build Order** — this is the bottom-up sequence for building
+4. Review **Reusable Components** — these get built first, reused everywhere
+5. Review **Design Tokens** — map extracted colors/fonts to project's existing tokens
+6. Review **Assets** — confirm icons and images are exported
+
+### Step 2: Understand the Decomposition
+
+The extractor chunks the design into ~10K token pieces. Each chunk is one
+buildable unit. But YOU need to understand HOW these chunks connect:
+
+```
+READING ORDER (top-down — understand):
+Full Screen → Section → Component → Frame → Inner Frame → Leaf
+
+Screen (Futures/Home)                    ← you read this FIRST
+├─ Section: Header                       ← then understand each section
+│  └─ Component: TopHeader (chunk)       ← then what each component IS
+├─ Section: P&L                          ← and how they connect
+│  └─ Component: PnlGradient (chunk)
+├─ Section: Start Trading
+│  ├─ Component: CoinTabs (chunk)        ← this is a TAB BAR, not buttons
+│  ├─ Component: Chart (chunk)           ← this is CHART data, not an image
+│  └─ Component: TradeButtons (chunk)    ← these are CTAs, connected to coin
+├─ Section: Watchlist
+│  ├─ Component: WatchlistTabs (chunk)
+│  └─ Component: CoinList (chunk)        ← this is a LIST, not hardcoded rows
+└─ Section: Bottom Nav (chunk)           ← this is NAVIGATION, not a toolbar
+```
+
+By reading top-down, you capture the CONTEXT that each component exists within.
+The CoinTabs component isn't just "a row of pills" — it's the selector that
+controls which coin the chart and trade buttons show. That context matters.
+
+### Step 3: Chunk Sizing Rule
+
+**Each buildable component must be ≤ 9.5K-10K tokens.**
+
+If a chunk is still too large or complex, drill deeper:
+
+```
+Section too large?
+└─ Drill into its children (nodes)
+   └─ Node still too large?
+      └─ Drill into its frames
+         └─ Frame still too large?
+            └─ Drill into underlying frames
+               └─ Build at the leaf level where one component
+                  fits within ~10K tokens
+```
+
+The extractor already does this chunking automatically. But when BUILDING,
+if a component feels too complex to get right in one pass — break it down
+further yourself. Build the inner pieces first, verify each one, then
+assemble the parent.
+
+**Never try to build a 30K+ token component in one shot.** Decompose until
+each piece is small enough to hold in full context with every style property.
+
+### Step 4: Present Inventory
 
 Present the inventory to the user:
 
@@ -227,6 +305,12 @@ Figma Design: <name>
 Sections: <N> top-level
 Components: <N> unique, <M> total instances
 Build order: <N> steps (leaves first → full screen)
+
+Decomposition:
+  Screen
+  ├─ Header section (2 chunks)
+  ├─ Content section (8 chunks)
+  └─ Navigation (1 chunk)
 
 Reusable components:
   - ComponentA (used Nx)
@@ -327,25 +411,68 @@ If ANY of the following is unclear, STOP and ask the user:
 
 ## Phase 3 — Build-Verify-Iterate (Per Component)
 
-This is the core workflow. Build one component at a time, verify it against the
-Figma screenshot, iterate until it matches, then move to the next.
+**BUILD BOTTOM-UP. Smallest leaves first, assemble upward, verify at every level.**
+
+```
+BUILDING ORDER (bottom-up — opposite of reading):
+
+BUILD: Leaf widgets first (smallest, most atomic)
+  └─ Verify each leaf against its chunk screenshot
+THEN: Assemble leaves into parent frames
+  └─ Verify parent against its chunk screenshot
+THEN: Assemble parents into sections
+  └─ Verify section against its section screenshot
+THEN: Assemble sections into full screen
+  └─ Verify full screen against full-screen screenshot
+```
+
+The key insight: **you READ top-down to get context, you BUILD bottom-up for
+precision.** By the time you're assembling parents, the children are already
+verified — errors don't compound upward.
+
+### The 10K Token Rule
+
+Each component you build must be **≤ 9.5K-10K tokens** of complexity.
+This ensures you can hold the FULL spec + screenshot + code in context
+simultaneously, with nothing dropped or approximated.
+
+If a chunk feels too large:
+1. Read its children list in the chunk spec
+2. Build each child as a separate widget first
+3. Verify each child individually
+4. Then assemble the parent using the already-verified children
+
+Example — a "Start Trading" section is too complex as one unit:
+```
+Start Trading (too big — ~25K tokens)
+├─ CoinTabs widget (build first, ~5K tokens) ✅ verified
+├─ ChartArea widget (build next, ~8K tokens) ✅ verified
+├─ PriceInfo widget (build next, ~3K tokens) ✅ verified
+└─ TradeButtons widget (build next, ~3K tokens) ✅ verified
+→ Now assemble StartTradingSection from verified children (~4K tokens)
+→ Verify assembled section against screenshot
+```
 
 ### Step 1: Build Reusable Components First
 
 For each entry in `reusables/`:
-1. Read the reusable spec file
+1. Read the reusable spec file — these are small, usually ≤ 5K tokens
 2. Check codebase for an existing component that matches
 3. If no match exists, build it following the framework reference file
 4. **Verify** (see Step 4 below)
 
+Reusables are built first because they're referenced by multiple chunks.
+Building them first means they're verified and ready when parent chunks need them.
+
 ### Step 2: Build Each Leaf Chunk (numbered order)
 
-For each leaf chunk in `chunks/`:
+For each leaf chunk in `chunks/` (the extractor numbers them in build order):
 
 **2a — Read BOTH the spec AND the screenshot**
 1. Read the chunk `.md` file — exact layout, typography, colors, children
 2. Read the chunk screenshot — understand WHAT this component IS visually
-3. Identify the semantic UI pattern (from Phase 2.5 mapping)
+3. Recall the semantic UI pattern from Phase 2.5 (you already know what this IS)
+4. Recall the parent context from Phase 2 (you already know where this fits)
 
 **2b — Check every style property** (non-negotiable)
 Before writing code, mentally go through EVERY property in the spec:
