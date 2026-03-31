@@ -36,6 +36,10 @@ export class FigmaAPI {
     return this.#request(`${BASE_URL}/images/${fileKey}?${params}`);
   }
 
+  async getImageFills(fileKey) {
+    return this.#request(`${BASE_URL}/files/${fileKey}/images`);
+  }
+
   async downloadImage(url, destPath) {
     const res = await this.#fetch(url);
     if (!res.ok) throw new Error(`Failed to download image: ${res.status}`);

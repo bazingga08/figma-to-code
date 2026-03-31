@@ -151,6 +151,30 @@ async function main() {
     }
   }
 
+  // Export images (fill images — uses getImageFills API)
+  if (imageIds.length > 0) {
+    console.log(`  Exporting ${imageIds.length} images as PNG...`);
+    try {
+      const fillsResult = await api.getImageFills(fileKey);
+      const imageFills = fillsResult.meta?.images || {};
+      for (const entry of assetManifest.filter(a => a.type === 'image')) {
+        // Find the imageRef for this entry from the asset exporter
+        const assets = assetExporter.getExportableAssets();
+        const imgAsset = assets.images.find(i => i.id === entry.nodeId);
+        if (imgAsset?.imageRef && imageFills[imgAsset.imageRef]) {
+          try {
+            await api.downloadImage(imageFills[imgAsset.imageRef], entry.filePath);
+          } catch (e) {
+            console.warn(`  Warning: Failed to download image ${entry.name}: ${e.message}`);
+          }
+        }
+      }
+      console.log(`  ${imageIds.length} images exported`);
+    } catch (e) {
+      console.warn(`  Warning: Image fills fetch failed: ${e.message}. Continuing.`);
+    }
+  }
+
   // 6. Write output files
   console.log('\n[6/6] Writing output files...');
 

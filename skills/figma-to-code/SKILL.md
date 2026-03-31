@@ -86,7 +86,13 @@ Wait for it to complete. It will output:
 - `chunks/` — per-component specs (~10K tokens each)
 - `reusables/` — component specs that are used multiple times
 - `screenshots/` — visual references per chunk
-- `assets/` — exported icons (SVG) and images (PNG)
+- `assets/icons/` — smart-filtered SVG icons (only real icons, not sub-paths)
+- `assets/images/` — fill images (PNG) downloaded via Figma Image Fills API
+
+**Asset filtering**: The extractor only exports real icons — INSTANCE components,
+semantic-named FRAMEs at icon sizes (12-48px), and STAR nodes. It skips junk
+sub-paths (Vector, Rectangle, Line, path* nodes inside compound shapes/groups).
+This typically reduces exports from thousands of nodes to ~10-30 real icons.
 
 If the extractor fails, check:
 1. Is `$FIGMA_ACCESS_TOKEN` set?
@@ -196,8 +202,11 @@ For each assembly chunk in `chunks/`:
 
 ### Asset Rule (absolute, no exceptions)
 - NEVER write inline SVG, Icon() widgets, or hand-code any vector
+- NEVER use Material Icons, CupertinoIcons, or framework placeholder icons
 - Every icon/illustration/image = use from `.figma-extract/assets/` or project assets
-- Render with the framework's image component
+- If an icon is missing from `.figma-extract/assets/`, flag it — do NOT substitute
+- Render with the framework's image component (SvgPicture.asset, Image.asset, etc.)
+- Fill images (backgrounds, photos) are in `assets/images/` as PNG
 
 ### The 90% Fidelity Checklist
 
