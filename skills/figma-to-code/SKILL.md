@@ -199,8 +199,19 @@ Wait for it to complete. It will output:
 - `chunks/` — per-component specs (~10K tokens each)
 - `reusables/` — component specs that are used multiple times
 - `screenshots/` — visual references per chunk
+- `raw/` — raw Figma JSON per chunk (source of truth — nothing dropped)
+- `AUDIT.md` — flags any node properties NOT captured by chunk-writer
 - `assets/icons/` — smart-filtered SVG icons (only real icons, not sub-paths)
 - `assets/images/` — fill images (PNG) downloaded via Figma Image Fills API
+
+**Raw JSON fallback**: The formatted chunk specs (`chunks/`) are readable but might
+miss edge-case properties. The raw JSON files (`raw/`) contain the COMPLETE Figma
+node data — nothing is dropped. If verification reveals a mismatch not explained by
+the formatted spec, check the raw JSON for the corresponding chunk.
+
+**Property audit**: `AUDIT.md` lists any Figma node properties found in the data
+but not explicitly handled by the chunk-writer. Review this during Phase 2 — if any
+flagged property could affect visual output, check the raw JSON for that node.
 
 **Asset filtering**: The extractor only exports real icons — INSTANCE components,
 semantic-named FRAMEs at icon sizes (12-48px), and STAR nodes. It skips junk
@@ -241,6 +252,9 @@ By the time you finish Phase 2, you know:
 4. Review **Reusable Components** — these get built first, reused everywhere
 5. Review **Design Tokens** — map extracted colors/fonts to project's existing tokens
 6. Review **Assets** — confirm icons and images are exported
+7. Review **AUDIT.md** (if present) — check for flagged uncaptured properties.
+   If any flagged property could affect visual output (e.g., a new Figma feature),
+   note it and check `raw/*.json` during building.
 
 ### Step 2: Understand the Decomposition
 
@@ -557,18 +571,32 @@ MISSING:  shadow not applied
 
 Apply specific fixes from the diff. Re-capture screenshot. Re-compare.
 
-**Max 3 iterations per component.** If still off after 3 tries:
-- Flag the specific mismatches to the user
-- Ask if they want to continue or fix manually
-- Move to next component
+**Keep iterating until 90-95% pixel-to-pixel match (up to 5 iterations).**
+
+Each iteration should fix specific mismatches from the structured diff:
+- Iteration 1: layout + spacing corrections
+- Iteration 2: typography + color corrections
+- Iteration 3: border radius + shadow + opacity corrections
+- Iteration 4: fine-tuning alignment, sub-pixel adjustments
+- Iteration 5: final polish
+
+If the formatted spec doesn't explain a mismatch, check `raw/*.json` for
+the corresponding chunk — the raw JSON has every Figma property, nothing dropped.
+
+If still below 90% after 5 iterations:
+- Flag the specific remaining mismatches to the user
+- Show both screenshots (Figma vs built)
+- Ask: "These differences remain. Should I continue, or should we adjust the approach?"
 
 **4e — Lock the component**
 
-Once verified, mark as done:
+Only lock when the component reaches **90-95% visual match** against the Figma
+screenshot. Keep iterating until it does (up to 5 times).
+
 ```
-✅ PnlSection — verified (1 iteration)
-✅ QuickActions — verified (2 iterations, fixed padding + icon size)
-⚠️ CandlestickChart — 85% match after 3 iterations (chart rendering differs)
+✅ PnlSection — verified (1 iteration, 95% match)
+✅ QuickActions — verified (3 iterations, fixed padding + icon size + gap, 93% match)
+⚠️ CandlestickChart — 88% match after 5 iterations (chart rendering differs from Figma rasterization)
 ⏳ WatchlistTabs — building...
 ```
 
@@ -670,10 +698,11 @@ Run through this for every component before marking it done:
 3. Show the screenshot and spec that's causing the issue
 4. Ask: "Would you like me to try a different approach, or should we skip this?"
 
-### When verification fails after 3 iterations
-1. List the specific remaining mismatches
+### When verification fails after 5 iterations
+1. List the specific remaining mismatches with percentages
 2. Show both screenshots (Figma vs built)
-3. Ask: "These differences remain. Should I continue iterating, move on, or do you want to fix these manually?"
+3. Check `raw/*.json` — maybe the formatted spec missed a property
+4. Ask: "After 5 iterations, these differences remain at ~X% match. Should I keep going, try a different approach, or do you want to fix manually?"
 
 ### When an asset is missing
 1. Do NOT use a Material Icon or placeholder

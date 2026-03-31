@@ -181,6 +181,15 @@ async function main() {
   // 6. Write output files
   console.log('\n[6/6] Writing output files...');
 
+  // Raw JSON per chunk — the source of truth, nothing dropped
+  await mkdir(join(outDir, 'raw'), { recursive: true });
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const fileName = `${String(i + 1).padStart(3, '0')}-${slugify(chunk.name)}.json`;
+    await writeFile(join(outDir, 'raw', fileName), JSON.stringify(chunk.nodeData, null, 2));
+  }
+  console.log(`  ${chunks.length} raw JSON files (source of truth)`);
+
   // Blueprint
   const blueprint = new BlueprintWriter({
     hierarchy,
@@ -217,6 +226,58 @@ async function main() {
     await writeFile(join(outDir, 'reusables', fileName), md);
   }
   console.log(`  ${reusableCount} reusable files`);
+
+  // Property audit — flag any node properties not captured by chunk-writer
+  const KNOWN_PROPS = new Set([
+    'id', 'name', 'type', 'children', 'visible',
+    'absoluteBoundingBox', 'absoluteRenderBounds', 'size',
+    'layoutMode', 'layoutSizingHorizontal', 'layoutSizingVertical',
+    'primaryAxisAlignItems', 'counterAxisAlignItems', 'layoutWrap',
+    'counterAxisSpacing', 'counterAxisAlignContent',
+    'layoutAlign', 'layoutGrow', 'layoutPositioning',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+    'itemSpacing',
+    'minWidth', 'maxWidth', 'minHeight', 'maxHeight',
+    'constraints', 'clipsContent', 'overflowDirection',
+    'fills', 'strokes', 'strokeWeight', 'strokeAlign',
+    'strokeCap', 'strokeJoin', 'strokeDashes', 'dashPattern',
+    'individualStrokeWeights',
+    'cornerRadius', 'rectangleCornerRadii', 'cornerSmoothing',
+    'effects', 'opacity', 'blendMode', 'rotation',
+    'isMask', 'maskType',
+    'characters', 'style', 'characterStyleOverrides', 'styleOverrideTable',
+    'textTruncation', 'maxLines',
+    'componentId', 'componentProperties',
+    'styles', 'exportSettings', 'preserveRatio',
+    'relativeTransform', 'locked',
+    'transitionNodeID', 'transitionDuration', 'transitionEasing',
+    'interactions', 'reactions',
+    'pluginData', 'sharedPluginData', 'componentPropertyReferences',
+    'boundVariables', 'explicitVariableModes', 'annotations', 'devStatus',
+  ]);
+
+  const uncaptured = new Map();
+  function auditNode(node) {
+    for (const key of Object.keys(node)) {
+      if (!KNOWN_PROPS.has(key) && !uncaptured.has(key)) {
+        uncaptured.set(key, { nodeId: node.id, nodeName: node.name, nodeType: node.type });
+      }
+    }
+    for (const child of node.children || []) auditNode(child);
+  }
+  auditNode(rootDoc);
+
+  if (uncaptured.size > 0) {
+    let audit = `# Property Audit\n\nProperties found in Figma data but not explicitly handled by chunk-writer.\nCheck raw/*.json if these affect visual output.\n\n`;
+    audit += `| Property | First seen on | Type |\n|---|---|---|\n`;
+    for (const [key, info] of uncaptured) {
+      audit += `| \`${key}\` | ${info.nodeName} (${info.nodeId}) | ${info.nodeType} |\n`;
+    }
+    await writeFile(join(outDir, 'AUDIT.md'), audit);
+    console.log(`  AUDIT.md — ${uncaptured.size} uncaptured properties flagged`);
+  } else {
+    console.log('  No uncaptured properties found');
+  }
 
   console.log(`\nDone! Output in ${outDir}/`);
   console.log(`\nNext: Claude reads ${outDir}/blueprint.md and builds bottom-up.`);
