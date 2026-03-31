@@ -108,13 +108,13 @@ export class BlueprintWriter {
     md += '\n### Spacing Scale\n\n';
     md += spacing.length ? spacing.map(s => `\`${s}px\``).join(', ') : 'No spacing extracted.';
 
-    const radii = tokens.radii || [];
+    const radii = this.#data.tokens.radii || [];
     if (radii.length) {
       md += '\n\n### Border Radius Scale\n\n';
       md += radii.map(r => `\`${r}px\``).join(', ');
     }
 
-    const shadows = tokens.shadows || [];
+    const shadows = this.#data.tokens.shadows || [];
     if (shadows.length) {
       md += '\n\n### Shadows\n\n';
       md += '| Type | Offset | Blur | Spread | Color | Uses |\n|---|---|---|---|---|---|\n';
@@ -123,7 +123,7 @@ export class BlueprintWriter {
       }
     }
 
-    const borderWidths = tokens.borderWidths || [];
+    const borderWidths = this.#data.tokens.borderWidths || [];
     if (borderWidths.length) {
       md += '\n\n### Border Widths\n\n';
       md += borderWidths.map(w => `\`${w}px\``).join(', ');
