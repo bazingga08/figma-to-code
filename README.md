@@ -1,22 +1,30 @@
-# Figma to Code — Claude Code Plugin
+# Figma to Code v2 — Claude Code Plugin
 
 A Claude Code plugin that converts Figma designs to pixel-perfect production code. Supports **React (Next.js / Vite / CRA)**, **React Native (Expo / bare)**, and **Flutter**.
 
-## Installation
+**v2** uses the Figma REST API directly to pre-extract the full design tree, eliminating MCP tool limits and handling designs of any size.
+
+## Setup
+
+### 1. Install the Plugin
 
 ```bash
 /plugin install <your-org>/figma-to-code-plugin
 ```
 
-Or install from a git URL:
+### 2. Set Your Figma Token
+
+Generate a Personal Access Token at: Figma → Settings → Account → Personal access tokens
 
 ```bash
-/plugin install https://github.com/<your-org>/figma-to-code-plugin.git
+export FIGMA_ACCESS_TOKEN=figd_xxxxx
 ```
 
-After installation, run `/reload-plugins` to activate.
+Add to your shell profile (`.zshrc`, `.bashrc`) to persist across sessions.
 
-## Usage
+**Requirements:** Pro plan with Full or Dev seat (View/Collab seats have severe API rate limits).
+
+### 3. Use It
 
 Share a Figma link in Claude Code:
 
@@ -30,73 +38,43 @@ Or use the skill directly:
 /figma-to-code https://figma.com/design/abc123/MyProject?node-id=1-2
 ```
 
-The skill activates automatically when you:
-- Paste a `figma.com` URL
-- Say "build this from Figma", "implement the design", "match the Figma"
-- Reference a Figma file or node ID
+## How It Works
 
-## What It Does
+### Stage 1: Extract (automatic)
+The plugin runs a Node.js script that:
+1. Fetches the **complete** design tree via Figma REST API (no truncation)
+2. Analyzes structure — hierarchy, layout patterns, nesting
+3. Detects **reusable components** — build once, use everywhere
+4. Extracts **design tokens** — colors, typography, spacing
+5. Exports **assets** — icons as SVG, images as PNG
+6. Chunks the tree into **~10K-token specs** for reliable processing
 
-1. **Detects your framework** — React, React Native, or Flutter (auto-detected from project files)
-2. **Scans your project** — discovers theme tokens, existing components, styling approach, assets directory
-3. **Maps the entire Figma file** — presents a numbered inventory of all screens
-4. **Adaptive deep scan** — for complex screens that exceed Figma's ~10K token limit, recursively decomposes into smaller frames and builds bottom-up
-5. **Smart image detection** — auto-imports photos/icons/illustrations from Figma, asks before importing ambiguous content (banners, heroes)
-6. **Pixel-perfect implementation** — builds components matching Figma exactly, reusing existing project components
-7. **Live progress updates** — shows a visual tree of what's built, building, and queued
-8. **Fidelity verification** — runs a 90% fidelity checklist before marking any screen done
+### Stage 2: Build (Claude)
+1. **Top-down reading** — Claude reads the blueprint, understands the full structure
+2. **Bottom-up building** — starts from leaf components, assembles upward
+3. **Pixel verification** — checks against screenshots at every step
+4. **Fidelity check** — 90% fidelity checklist before marking done
+
+## v1 vs v2
+
+| | v1 (MCP-based) | v2 (REST API) |
+|---|---|---|
+| Data source | Figma MCP tools (~10K token limit) | REST API (full tree, no limit) |
+| API calls | 30-60+ recursive calls | 3-5 calls total |
+| Large designs | Gets stuck / errors | Works reliably |
+| Component detection | Claude figures it out | Pre-analyzed by script |
+| Asset export | One-by-one via MCP | Batch export |
 
 ## Optional: Project Configuration
 
-The plugin discovers project context automatically. For faster setup, add this to your project's `CLAUDE.md`:
+Add to your project's `CLAUDE.md` for faster setup:
 
 ```markdown
 ## Figma-to-Code Config
-
-- **Figma file key**: `YOUR_FILE_KEY_HERE`
-- **Framework**: Next.js 14 (auto-detected if not specified)
+- **Framework**: Next.js 14
 - **Styling**: CSS Modules
 - **Theme file**: `src/theme/theme.css`
 - **Assets directory**: `src/assets/`
 - **Components directory**: `src/components/`
-- **Reusable components**: Button, Modal, Card, Input, Spinner, Toast
-- **State management**: Redux Toolkit
-- **API layer**: `src/core/api/`
-```
-
-## Supported Frameworks
-
-| Framework | Reference File | Key Conventions |
-|-----------|---------------|-----------------|
-| React / Next.js | `references/react.md` | CSS Modules, next/image, TypeScript strict |
-| React Native / Expo | `references/react-native.md` | StyleSheet.create, theme tokens, typed navigation |
-| Flutter | `references/flutter.md` | AppColors/AppTextStyles, flutter_svg, BLoC/Riverpod |
-
-## How Adaptive Decomposition Works
-
-When a Figma screen is too complex for a single fetch (~10K token limit):
-
-```
-Fetch screen → too big?
-  YES → capture parent layout + screenshot
-      → enumerate children
-      → for each child: recurse (same size check, max 5-6 levels)
-      → build leaf components bottom-up
-      → assemble using parent layout metadata
-      → verify against screenshot
-  NO  → build directly with Design Brief
-```
-
-Progress is shown as a visual tree:
-
-```
-🧩 Building piece by piece...
-
-Dashboard Screen
-├─ Header ✅ built
-├─ Sidebar
-│  ├─ NavMenu ✅ built
-│  └─ UserProfile ⏳ building...
-├─ MainContent (queued)
-└─ Footer (queued)
+- **Reusable components**: Button, Modal, Card, Input
 ```
