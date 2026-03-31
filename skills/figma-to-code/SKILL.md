@@ -427,7 +427,34 @@ Scaffold
 **Every `clip:true` = clipBehavior on the container. Missing this = visual bleed.**
 **Every `isFixed` or constraint to TOP/BOTTOM = positioned outside scroll.**
 
-### Step 3: Identify Dynamic vs Static Content
+### Step 3: Identify Visual Complexity Per Section
+
+For EACH section in the semantic map, scan for properties that need special
+handling (not just simple layout + text):
+
+```
+For each section, flag if it contains:
+□ GRADIENTS — any non-solid fills? (linear, radial, angular, diamond?)
+□ MASKS — any masked images? (circle crop, custom shape clip?)
+□ SHADOWS — drop shadow or inner shadow? (affects depth perception)
+□ BLUR — layer blur or backdrop blur? (glow effects, frosted glass?)
+□ BLEND MODES — any non-PASS_THROUGH blend? (MULTIPLY, SCREEN, OVERLAY?)
+□ NEGATIVE GAP — overlapping children? (stacked cards, overlapping badges?)
+□ MIXED TEXT — any text with characterStyleOverrides? (bold words, colored spans?)
+□ PER-SIDE BORDERS — any borders with different weights per side?
+□ SCROLL — does this section scroll? Which axis? Nested within page scroll?
+□ IMAGES — any image fills? What scale mode? Any filters applied?
+□ ABSOLUTE CHILDREN — any pos:ABSOLUTE overlays? (badges, glow, gradients)
+□ CUSTOM SHAPES — any vector paths that aren't standard rectangles/circles?
+□ ROTATION — any rotated elements? (decorative angles, tilted icons)
+□ WRAP — do flex items wrap to next line? Or single-line with scroll?
+```
+
+This inventory prevents surprises during Phase 3 building — you'll know
+upfront which sections need Stack, ClipPath, RichText, gradient borders,
+custom painters, or special blur handling.
+
+### Step 4: Identify Dynamic vs Static Content
 
 Mark each section as STATIC or DYNAMIC:
 - **STATIC**: logos, labels, icons, navigation text, section headers
@@ -525,20 +552,60 @@ For each leaf chunk in `chunks/` (the extractor numbers them in build order):
 
 **2b — Check every style property** (non-negotiable)
 Before writing code, mentally go through EVERY property in the spec:
-- [ ] Layout: type, direction, width, height, sizing mode
-- [ ] Padding: all 4 sides exactly
-- [ ] Gap: item spacing
-- [ ] Alignment: main axis, cross axis
-- [ ] Background: fills (solid, gradient with angle, image with scale mode)
-- [ ] Border: strokeWeight, color, align, radius (all 4 corners), smoothing
-- [ ] Effects: shadows (offset, blur, spread, color), blur
-- [ ] Opacity, blend mode, rotation
-- [ ] Clips content, overflow direction
-- [ ] Constraints, absolute positioning, min/max sizes
-- [ ] **Z-index / layering / stacking order** (see below)
-- [ ] Text: every single property (font, weight, size, lineHeight, letterSpacing,
-      color, case, decoration, align, truncation, maxLines, italic)
-- [ ] Mixed text styles (characterStyleOverrides)
+
+**Layout & Sizing:**
+- [ ] Layout direction: HORIZONTAL (Row) or VERTICAL (Column) or NONE (Stack)
+- [ ] Width: FIXED (exact px) / FILL (Expanded, stretch to parent) / HUG (shrink-wrap)
+- [ ] Height: FIXED / FILL / HUG — same rules
+- [ ] Padding: all 4 sides exactly (top, right, bottom, left)
+- [ ] Gap: item spacing (can be NEGATIVE for overlapping items — use Transform.translate)
+- [ ] Alignment: main axis AND cross axis independently (SPACE_BETWEEN ≠ CENTER)
+- [ ] Wrap: NO_WRAP (single line) vs WRAP (Wrap widget, items flow to next line)
+- [ ] Grow/flex factor: `grow:1` = Expanded/Flexible in Flutter, `flex:1` in CSS
+- [ ] Min/max width & height constraints (ConstrainedBox / min-width, max-width)
+- [ ] Overflow: HORIZONTAL_SCROLLING / VERTICAL_SCROLLING / clip / visible
+- [ ] Clips content: clip:true = clipBehavior: Clip.hardEdge (hides overflow)
+
+**Positioning & Layering:**
+- [ ] **Z-index / layering / stacking order** (see detailed guide below)
+- [ ] Absolute positioning: pos:ABSOLUTE = Stack + Positioned, NOT in flex flow
+- [ ] Absolute coordinates: exact x, y from spec for positioned elements
+- [ ] Constraints: h=LEFT/RIGHT/CENTER/SCALE/STRETCH, v=TOP/BOTTOM/CENTER/SCALE/STRETCH
+- [ ] isFixed: elements pinned to viewport, outside scroll container
+- [ ] isMask/maskType: alpha/vector masks clip children to shape (ClipPath/ShaderMask)
+
+**Visual Surface:**
+- [ ] Fills: solid (with fill-level opacity), linear/radial/angular/diamond gradients
+      (angle, stops, type ALL matter — angular/diamond need special handling)
+- [ ] Fill vs node opacity: fill opacity affects only that fill; node opacity affects ALL children
+- [ ] Border: per-side weights (top/right/bottom/left can differ), color, strokeAlign
+      (INSIDE/CENTER/OUTSIDE — affects layout dimensions)
+- [ ] Border radius: all 4 corners independently (topLeft ≠ topRight is valid)
+- [ ] Corner smoothing: squircle vs circular arc (SmoothBorderRadius in Flutter)
+- [ ] Stroke cap (BUTT/ROUND/SQUARE) and join (BEVEL/MITER/ROUND) for path strokes
+- [ ] Stroke dash pattern: [dashLength, gapLength] for dashed/dotted lines
+- [ ] Effects: drop shadow vs inner shadow (inset) — different visual meaning
+      Each shadow has: x-offset, y-offset, blur, spread, color (all 5 matter)
+- [ ] Blur effects: layer blur (blurs element) vs backdrop blur (blurs what's behind)
+- [ ] Blend mode: PASS_THROUGH/MULTIPLY/SCREEN/OVERLAY (affects layer compositing)
+- [ ] Rotation: exact degrees, affects layout flow and child rendering
+- [ ] Image fills: scale mode (FILL/FIT/CROP/TILE), rotation, filters (brightness/saturation)
+
+**Typography (every text node):**
+- [ ] Font family, weight, size, italic
+- [ ] Line height (as px value — convert to multiplier: lineHeightPx / fontSize)
+- [ ] Letter spacing (can be negative for tight headers)
+- [ ] Paragraph spacing (space between paragraphs, different from line height)
+- [ ] Color (check spec, not assumption — grays are often subtly different)
+- [ ] Text case transform: UPPER/LOWER/TITLE (use textTransform, not hardcoded text)
+- [ ] Text decoration: underline, strikethrough, overline
+- [ ] Horizontal alignment: LEFT/CENTER/RIGHT/JUSTIFY
+- [ ] Vertical alignment: TOP/CENTER/BOTTOM within text frame
+- [ ] Auto-resize: WIDTH_AND_HEIGHT (hug both) / HEIGHT (fixed width, grow height) /
+      NONE (fixed both) — determines if text wraps, truncates, or overflows
+- [ ] Truncation: maxLines + overflow: ellipsis (only if autoResize ≠ WIDTH_AND_HEIGHT)
+- [ ] Mixed text styles (characterStyleOverrides): bold/colored/different-font spans
+      within one text node — requires RichText/Text.rich, not single Text widget
 
 **Z-Index / Layering / Stacking Order — critical for correct rendering:**
 
@@ -779,15 +846,35 @@ STRUCTURAL CHECKS (page-level):
 □ Scroll content doesn't overflow under fixed elements
 
 COMPONENT-LEVEL CHECKS (per section, re-examine against Figma screenshot):
-□ Background colors/gradients match exactly
-□ Border radius on all containers matches spec (all 4 corners)
-□ Shadows and glow effects present where specified
+□ Background colors/gradients match exactly (type: linear/radial/angular, angle, stops)
+□ Fill opacity vs node opacity — correct level applied
+□ Border radius on all containers matches spec (all 4 corners independently)
+□ Per-side border weights correct (top/right/bottom/left can differ)
+□ Stroke align correct (INSIDE/CENTER/OUTSIDE affects box dimensions)
+□ Shadows present: drop shadow AND/OR inner shadow, with correct type
+□ Shadow properties: x-offset, y-offset, blur, spread, color (all 5)
+□ Blur effects: layer blur vs backdrop blur, correct radius
+□ Blend modes applied where non-default (MULTIPLY/SCREEN/OVERLAY)
 □ Opacity values correct (0.3 glow, 0.5 grid lines, etc.)
+□ Masks applied: circle crop, custom shape clip (ClipPath/ClipOval)
+□ Corner smoothing (squircle) where specified
+□ Dashed/dotted borders with correct dash pattern
+□ Rotation angle correct on rotated elements
+
+SIZING & FLEX CHECKS:
+□ Width/height sizing modes correct (FIXED/FILL/HUG per component)
+□ Grow/flex factor applied where spec says grow:1 (Expanded in Flutter)
+□ Min/max size constraints applied
+□ Negative gap handled (overlapping items via Transform or Stack)
+□ Wrap behavior correct (single-line scroll vs multi-line wrap)
+□ Layout direction correct per container (Row vs Column vs Stack)
 
 ICON & ASSET CHECKS:
 □ Every icon uses extracted SVG from assets/, NOT Material Icons or placeholders
 □ Coin logos correct per-coin (BTC = bitcoin SVG, others = their specific logo)
 □ Image fills use actual exported PNGs, not colored rectangles
+□ Image scale mode correct (FILL/FIT/CROP — BoxFit.cover vs contain vs fill)
+□ Image filters applied if specified (brightness, saturation)
 □ Icon colors match spec (not default white when spec says #718096, etc.)
 □ Icon sizes match spec exactly
 
@@ -795,8 +882,14 @@ TYPOGRAPHY CHECKS (scan full page for visible text mismatches):
 □ Font family correct (Manrope vs Roboto vs Rubik)
 □ Font weights visually distinguishable where spec differs (500 vs 600 vs 700)
 □ Text colors match — especially grays (#A0AEC0 vs #718096 vs #4A5568)
-□ Letter spacing applied where specified (0.36px, 0.42px)
+□ Letter spacing applied where specified (0.36px, 0.42px, including negative)
+□ Line height matches (px value / fontSize = multiplier)
+□ Text case transforms applied (UPPER/LOWER via textTransform, not hardcoded)
+□ Text decoration correct (underline, strikethrough where specified)
+□ Vertical text alignment matches (TOP/CENTER/BOTTOM within frame)
+□ Auto-resize mode correct (hug vs fixed-width-grow-height vs fixed-both)
 □ Text truncation/maxLines applied on dynamic text
+□ Mixed text styles rendered with RichText (bold words, colored spans)
 
 LAYOUT & SPACING CHECKS:
 □ Horizontal padding matches (usually 16px from screen edge)
@@ -952,34 +1045,57 @@ per-component verification missed:
 Run through this for every component before marking it done:
 
 **Spacing & Layout**
-- [ ] Every padding/gap/margin matches spec exactly (no rounding)
-- [ ] Container widths/heights match (FIXED/FILL/HUG)
-- [ ] Main axis + cross axis alignment match
-- [ ] Absolute positioned elements are positioned correctly
-- [ ] Min/max constraints applied where specified
-- [ ] Clips content / overflow matches
+- [ ] Layout direction correct (HORIZONTAL=Row, VERTICAL=Column, NONE=Stack)
+- [ ] Every padding matches spec exactly — all 4 sides (no rounding)
+- [ ] Gap matches exactly (including NEGATIVE gap for overlapping items)
+- [ ] Container sizing modes correct: FIXED (exact px) / FILL (Expanded) / HUG (shrink)
+- [ ] Main axis + cross axis alignment BOTH match independently
+- [ ] Grow/flex factor applied where spec says grow:1
+- [ ] Wrap behavior correct (NO_WRAP=single line, WRAP=multi-line Wrap widget)
+- [ ] Absolute positioned elements at correct x,y coordinates
+- [ ] Min/max width/height constraints applied where specified
+- [ ] Clips content / overflow behavior matches (clip:true = Clip.hardEdge)
+- [ ] Scroll direction correct (HORIZONTAL_SCROLLING / VERTICAL_SCROLLING)
+- [ ] Nested scroll works (horizontal list inside vertical page scroll)
 
 **Typography (every text node)**
 - [ ] Font family matches exactly
 - [ ] Font weight matches exactly
 - [ ] Font size matches exactly
+- [ ] Font style: italic applied where specified
 - [ ] Line height matches (as multiplier: lineHeightPx / fontSize)
-- [ ] Letter spacing applied
-- [ ] Text color matches (check spec, not assumption)
-- [ ] Text case (uppercase, etc.) applied
-- [ ] Text decoration (underline, etc.) applied
-- [ ] Text alignment (horizontal + vertical) matches
-- [ ] Truncation / maxLines applied
-- [ ] Mixed styles handled (bold words, colored spans)
+- [ ] Letter spacing applied (including negative for tight headers)
+- [ ] Paragraph spacing applied for multi-paragraph text
+- [ ] Text color matches (check spec — grays differ subtly: #A0AEC0 ≠ #718096)
+- [ ] Text case transform via textTransform (UPPER/LOWER), not hardcoded text
+- [ ] Text decoration: underline, strikethrough, overline where specified
+- [ ] Horizontal text alignment matches (LEFT/CENTER/RIGHT/JUSTIFY)
+- [ ] Vertical text alignment matches (TOP/CENTER/BOTTOM within frame)
+- [ ] Auto-resize mode: WIDTH_AND_HEIGHT (hug) / HEIGHT (fixed width) / NONE (fixed)
+- [ ] Truncation / maxLines applied where auto-resize ≠ WIDTH_AND_HEIGHT
+- [ ] Mixed styles: RichText/Text.rich for characterStyleOverrides (bold/colored spans)
 
 **Color & Surface**
-- [ ] All fills match — solid colors, gradients (with correct angle)
-- [ ] Border radius matches — all 4 corners
-- [ ] Corner smoothing applied where specified
-- [ ] Border/stroke matches — weight, color, align
-- [ ] Box shadow matches — offset, blur, spread, color
-- [ ] Opacity applied at correct level (node vs fill)
-- [ ] Gradient stops and positions match
+- [ ] All fills match — solid colors with correct fill-level opacity
+- [ ] Gradient type correct: linear / radial / angular / diamond
+- [ ] Gradient angle, stops, and positions match exactly
+- [ ] Fill opacity vs node opacity: correct level (fill-only vs all children)
+- [ ] Border weight matches — per-side if spec has individual weights
+- [ ] Border color, strokeAlign (INSIDE/CENTER/OUTSIDE) correct
+- [ ] Border radius matches — all 4 corners independently
+- [ ] Corner smoothing (squircle) applied where specified
+- [ ] Stroke cap (BUTT/ROUND/SQUARE) and join (BEVEL/MITER/ROUND) correct
+- [ ] Dashed/dotted borders with correct dash pattern
+- [ ] Drop shadow: x-offset, y-offset, blur, spread, color (all 5)
+- [ ] Inner shadow (inset): separate from drop shadow, different visual effect
+- [ ] Blur effects: layer blur vs backdrop blur, correct radius
+- [ ] Blend mode applied where non-default (MULTIPLY/SCREEN/OVERLAY)
+- [ ] Rotation angle matches exactly
+
+**Masks & Clipping**
+- [ ] isMask elements create correct clip shape (ClipOval, ClipPath, ClipRRect)
+- [ ] Masked images render in shape (circle, custom path), not as rectangles
+- [ ] Custom vector shapes rendered via SVG or CustomPaint (not approximated)
 
 **Semantic Correctness**
 - [ ] Component type matches design intent (tab bar IS a tab bar)
@@ -988,17 +1104,19 @@ Run through this for every component before marking it done:
 - [ ] Navigation patterns use proper framework widgets
 
 **Z-Index / Layering / Stacking**
-- [ ] Absolute-positioned children use Stack + Positioned, not in flow
+- [ ] Absolute-positioned children use Stack + Positioned, not in flex flow
 - [ ] Stack child order matches Figma paint order (first = bottom, last = top)
-- [ ] Glow/blur elements behind content, not on top
+- [ ] Glow/blur elements layered behind content, not on top
 - [ ] Status badges overlay card edges correctly
 - [ ] clip:true containers use clipBehavior, preventing overflow bleed
 - [ ] Fixed elements (header/nav) stay above scroll content
 
-**Assets**
+**Assets & Images**
 - [ ] All icons from `.figma-extract/assets/` at exact size
-- [ ] No icon is hand-coded or substituted
-- [ ] Images use correct scale mode (FILL/FIT/COVER)
+- [ ] No icon is hand-coded, substituted, or replaced with Material Icons
+- [ ] Image fills use correct scale mode (FILL=cover, FIT=contain, CROP=clip)
+- [ ] Image filters applied if specified (brightness, saturation adjustments)
+- [ ] Image rotation applied if specified
 
 ---
 
