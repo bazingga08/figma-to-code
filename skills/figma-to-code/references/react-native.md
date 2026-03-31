@@ -128,8 +128,186 @@ type Props = { navigation: NativeStackNavigationProp<RootStackParamList, "Screen
 - Never call API inside component body
 - Use custom hooks (`useAddressBook`, `useUserProfile`) to encapsulate data fetching
 
+### Spacing Tokens
+```ts
+// theme/spacing.ts
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
+};
+// Usage: padding: spacing.lg
+```
+
+### Gradients
+```tsx
+import { LinearGradient } from "expo-linear-gradient";
+// Figma: linear-gradient(180deg, #087A4D 0%, #121319 70%)
+<LinearGradient
+  colors={["#087A4D", "#121319"]}
+  locations={[0, 0.7]}
+  start={{ x: 0.5, y: 0 }}
+  end={{ x: 0.5, y: 1 }}
+  style={styles.gradientBg}
+/>
+```
+
+### Responsive Layout
+```tsx
+import { useWindowDimensions } from "react-native";
+const { width } = useWindowDimensions();
+// Adapt layout based on screen width
+const columns = width > 600 ? 3 : 2;
+
+// Use percentage-based widths or flex for adaptive layouts
+{ width: "100%" }  // ✅ fills container
+{ width: 375 }     // ❌ breaks on small/large screens
+
+// EdgeInsets: use start/end for RTL
+{ paddingStart: 16, paddingEnd: 8 }  // ✅ RTL-safe
+{ paddingLeft: 16, paddingRight: 8 } // ❌ breaks in RTL
+```
+
+### Accessibility
+```tsx
+// Every interactive element
+<Pressable
+  accessibilityRole="button"
+  accessibilityLabel="Add to watchlist"
+  accessibilityState={{ selected: isWatchlisted }}
+  hitSlop={12} // ensure 48x48 minimum tap target
+  onPress={handlePress}
+/>
+
+// Every image
+<Image source={coinIcon} accessibilityLabel="Bitcoin logo" />
+
+// Decorative images
+<Image source={bgPattern} accessible={false} />
+
+// Headings for screen reader navigation
+<Text accessibilityRole="header">Announcements</Text>
+```
+
+### Data Models & State Integration
+```tsx
+// Generate from visible design data
+interface CoinListItem {
+  symbol: string;
+  pair: string;
+  price: number;
+  changePercent: number;
+  iconUrl: string;
+}
+
+// Widget accepts data via props
+const CoinRow = React.memo(({ coin }: { coin: CoinListItem }) => { ... });
+
+// Screen connects to state
+function WatchlistScreen() {
+  const { data, isLoading, error } = useCoinList();
+  if (isLoading) return <SkeletonList />;
+  if (error) return <ErrorRetry onRetry={refetch} />;
+  if (!data?.length) return <EmptyState message="No coins" />;
+  return <FlatList data={data} renderItem={({ item }) => <CoinRow coin={item} />} />;
+}
+```
+
+### Animation & Gestures
+```tsx
+// Tap feedback: always Pressable, never TouchableOpacity (deprecated pattern)
+import { Pressable } from "react-native";
+<Pressable
+  onPress={handlePress}
+  style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+/>
+
+// Gesture handler for swipe-to-dismiss, pull-to-refresh
+import { Swipeable } from "react-native-gesture-handler";
+import Animated, { FadeIn, SlideInRight } from "react-native-reanimated";
+<Animated.View entering={FadeIn.duration(200)}>
+```
+
+### FlatList Advanced Optimization
+```tsx
+<FlatList
+  data={coins}
+  renderItem={renderCoinRow}
+  keyExtractor={(item) => item.symbol}
+  getItemLayout={(_, index) => ({ length: 56, offset: 56 * index, index })} // fixed height rows
+  windowSize={10}
+  maxToRenderPerBatch={15}
+  removeClippedSubviews={true}
+  ItemSeparatorComponent={Divider}
+  ListEmptyComponent={<EmptyState />}
+  ListHeaderComponent={<ListHeader />}
+/>
+```
+
+### Platform-Specific Code
+```tsx
+import { Platform } from "react-native";
+// Conditional styles
+{ paddingTop: Platform.OS === "ios" ? 0 : StatusBar.currentHeight }
+
+// Platform-specific files
+// Button.ios.tsx, Button.android.tsx → imported as Button
+```
+
+### Edge Cases
+```tsx
+// Every dynamic text: numberOfLines + ellipsizeMode
+<Text numberOfLines={1} ellipsizeMode="tail">{coin.name}</Text>
+
+// Every network image: fallback
+<Image source={{ uri: coin.iconUrl }} defaultSource={require("@/assets/placeholder.png")} />
+
+// Every list: empty state
+ListEmptyComponent={<EmptyState message="No items found" />}
+```
+
+### Navigation (React Navigation)
+```tsx
+// Typed navigation with deep links
+const Stack = createNativeStackNavigator<RootStackParamList>();
+<Stack.Navigator>
+  <Stack.Screen name="Home" component={HomeScreen} />
+  <Stack.Screen name="CoinDetail" component={CoinDetailScreen} />
+</Stack.Navigator>
+
+// Bottom tabs with persistence
+const Tab = createBottomTabNavigator();
+<Tab.Navigator>
+  <Tab.Screen name="Market" component={MarketScreen} />
+  <Tab.Screen name="Positions" component={PositionsScreen} />
+</Tab.Navigator>
+
+// Deep linking
+const linking = {
+  prefixes: ["myapp://"],
+  config: { screens: { CoinDetail: "coin/:symbol" } },
+};
+```
+
+### Error Boundaries
+```tsx
+// Wrap feature screens to prevent full-app crashes
+class ErrorBoundary extends React.Component<PropsWithChildren, { hasError: boolean }> {
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) return <ErrorFallback onRetry={() => this.setState({ hasError: false })} />;
+    return this.props.children;
+  }
+}
+```
+
 ### Performance
 - `FlatList` for any scrollable list — never `ScrollView` with mapped children
 - `React.memo` on heavy list item components
 - `useCallback` on handlers passed to list items
 - Avoid anonymous functions in JSX (`onPress={() => fn()}` → `onPress={handlePress}`)
+- `expo-image` over `Image` for better caching and performance
+- `FlashList` from Shopify for highest-performance lists (drop-in FlatList replacement)

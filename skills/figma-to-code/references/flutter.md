@@ -161,17 +161,189 @@ BoxDecoration(
 - No business logic in widgets
 - Separate `Event → Bloc → State` or `Notifier → Provider`
 - All API calls go through Repository classes
+- Widget accepts data via constructor — never fetch inside `build()`
+- Generate loading/error/empty state variants for every screen
+
+```dart
+// Pattern: stateless widget accepts model, stateful wrapper connects to state
+class CoinRow extends StatelessWidget {
+  final CoinListItem coin;  // data model, not hardcoded
+  const CoinRow({super.key, required this.coin});
+  // ...
+}
+
+// Screen connects to BLoC/Provider
+class WatchlistScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<WatchlistBloc, WatchlistState>(
+      builder: (context, state) {
+        if (state is WatchlistLoading) return const ShimmerList();
+        if (state is WatchlistError) return ErrorRetry(onRetry: () => ...);
+        if (state is WatchlistEmpty) return const EmptyState(message: 'No coins');
+        return ListView.builder(...);
+      },
+    );
+  }
+}
+```
 
 ### Navigation
 - Use `GoRouter` or `Navigator 2.0`
 - Named routes, typed params
+- Bottom navigation: `StatefulShellRoute` in GoRouter or `IndexedStack` for persistence
+- Deep links: configure route paths for shareable screens
+- Hero transitions: add `Hero(tag: 'coin-${id}')` for shared elements between screens
+- Back navigation: test Android back gesture + iOS swipe-back
 
 ### Lists
 - `ListView.builder` for variable-length lists — never `ListView` with mapped children
 - `GridView.builder` for grids
 - `const` constructors wherever possible
+- `FlatList` with `itemExtent` for fixed-height rows (skips measurement)
+- Always handle: 0 items (empty state), 1 item, many items
+- `SliverList` + `CustomScrollView` for heterogeneous scrollable pages
+
+### Responsive Layout
+```dart
+// Use LayoutBuilder for adaptive widths — never hardcode screen width
+LayoutBuilder(
+  builder: (context, constraints) {
+    if (constraints.maxWidth > 600) return TabletLayout();
+    return MobileLayout();
+  },
+)
+
+// Use Expanded/Flexible instead of fixed widths for content
+Row(children: [
+  Expanded(child: Text('Name')),        // ✅ fills available space
+  SizedBox(width: 200, child: price),   // ❌ breaks on small screens
+])
+
+// EdgeInsetsDirectional for RTL support
+padding: EdgeInsetsDirectional.only(start: 16, end: 8) // ✅
+padding: EdgeInsets.only(left: 16, right: 8)            // ❌ breaks in RTL
+```
+
+### Accessibility
+```dart
+// Every interactive element: InkWell with minimum 48x48 tap target
+InkWell(
+  onTap: () {},
+  child: Padding(
+    padding: EdgeInsets.all(12), // ensures 48x48 minimum
+    child: Icon(Icons.star, size: 24, semanticLabel: 'Add to watchlist'),
+  ),
+)
+
+// Every icon: semanticLabel
+SvgPicture.asset('icon.svg', semanticsLabel: 'Navigate forward')
+
+// Compound widgets: merge semantics
+MergeSemantics(
+  child: Row(children: [icon, Text('Settings')]),
+)
+
+// Decorative images: exclude from semantics
+ExcludeSemantics(child: Image.asset('decorative_bg.png'))
+```
+
+### Platform Concerns
+```dart
+// SafeArea — wrap content or verify Scaffold handles it
+SafeArea(child: content)
+
+// Status bar style — match design header
+SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+  statusBarColor: Colors.transparent,
+  statusBarIconBrightness: Brightness.light, // for dark headers
+))
+
+// Keyboard avoidance for input screens
+Scaffold(resizeToAvoidBottomInset: true)
+
+// Pull-to-refresh for list screens
+RefreshIndicator(onRefresh: () async { ... }, child: listView)
+```
+
+### Theme Integration
+```dart
+// Wire colors through ThemeData, not static class
+// AppColors can exist as TOKEN MAPPING but access via Theme.of(context)
+final theme = ThemeData(
+  colorScheme: ColorScheme.dark(
+    surface: Color(0xFF121319),
+    onSurface: Color(0xFFEDF2F7),
+    primary: Color(0xFF0ECB81),
+    error: Color(0xFFF14366),
+  ),
+  extensions: [AppTokens(gold: Color(0xFFCDA954), grey01: Color(0xFFA4A5AB))],
+);
+
+// In widgets:
+Theme.of(context).colorScheme.surface  // ✅
+AppColors.background                    // ❌ not theme-aware
+```
+
+### Data Models
+```dart
+// Generate from visible design data shapes
+class CoinListItem {
+  final String symbol;
+  final String pair;
+  final double price;
+  final double changePercent;
+  final String iconUrl;
+  const CoinListItem({...});
+}
+
+// Repository stub
+abstract class CoinRepository {
+  Future<List<CoinListItem>> getCoins();
+  Future<CoinListItem> getCoin(String symbol);
+}
+```
+
+### Edge Case Handling
+```dart
+// Every dynamic text: maxLines + overflow
+Text(coin.name, maxLines: 1, overflow: TextOverflow.ellipsis)
+
+// Every network image: error + placeholder
+CachedNetworkImage(
+  imageUrl: coin.iconUrl,
+  width: 32, height: 32,
+  placeholder: (_, __) => ShimmerCircle(size: 32),
+  errorWidget: (_, __, ___) => Icon(Icons.error, size: 32),
+)
+
+// Image sizing: don't load 4K into 48x48
+Image.asset('large.png', cacheWidth: 96) // 2x for retina
+```
+
+### Animation & Interaction
+```dart
+// Tap feedback: always InkWell, never raw GestureDetector
+InkWell(onTap: () {}, borderRadius: BorderRadius.circular(8), child: ...)
+
+// Hero transitions for shared elements
+Hero(tag: 'coin-${coin.symbol}', child: coinIcon)
+
+// Page transitions matching Figma prototype
+GoRoute(
+  pageBuilder: (_, state) => CustomTransitionPage(
+    child: screen,
+    transitionsBuilder: (_, animation, __, child) =>
+      SlideTransition(position: Tween(begin: Offset(1, 0), end: Offset.zero).animate(animation), child: child),
+  ),
+)
+```
 
 ### Performance
 - `const` widget constructors wherever nothing changes at runtime
 - `RepaintBoundary` around expensive animated widgets
 - `ListView.builder` + `AutomaticKeepAliveClientMixin` for tabs
+- `CachedNetworkImage` for all network images with `cacheWidth`/`cacheHeight`
+- Avoid `Opacity` widget — use `color.withOpacity()` or `AnimatedOpacity` instead
+- Widget tree depth: refactor if >15 levels — extract sub-widgets
+- No `setState` in assembled screens — use state management

@@ -188,7 +188,25 @@ Scaffold
 └─ Fixed: Bottom NAVIGATION BAR (5 items)
 ```
 
-### Step 3: Flag Ambiguity — ASK, Don't Guess
+### Step 3: Identify Dynamic vs Static Content
+
+Mark each section as STATIC or DYNAMIC:
+- **STATIC**: logos, labels, icons, navigation text, section headers
+- **DYNAMIC**: user data, prices, lists from API, counts, percentages, timestamps
+
+For each DYNAMIC section, note the data dependency:
+```
+Example:
+- P&L value (₹11,453.87) → DYNAMIC (user portfolio API)
+- Coin list (ZLQA, ECSH...) → DYNAMIC (market API, paginated)
+- "Announcements" header → STATIC
+- Contest rank (#23 / 3.2K) → DYNAMIC (contest API)
+```
+
+This informs Phase 5c (State & Data Layer Pass) — every DYNAMIC value becomes
+a constructor parameter on the widget, backed by a data model.
+
+### Step 4: Flag Ambiguity — ASK, Don't Guess
 
 If ANY of the following is unclear, STOP and ask the user:
 - "Is this a tab bar or a button group?"
@@ -444,12 +462,92 @@ Run through this for every component before marking it done:
 
 ---
 
-## Phase 5 — Checkpoint Before Next Screen
+## Phase 5 — Production Hardening (per screen)
+
+Figma is the VISUAL spec. Production code also needs behavioral, responsive,
+accessible, and data-ready code. After visual fidelity is achieved, run this pass.
+
+### 5a — Responsive Layout Pass
+
+Figma designs are usually at 375px (1x iPhone). Production code must work everywhere.
+- Replace hardcoded widths with `Expanded`, `Flexible`, `double.infinity`, or `FractionallySizedBox`
+- Keep hardcoded values ONLY for: icon sizes, padding, gap, border radius, font sizes
+- Wrap screens with `SafeArea` (or verify `Scaffold` handles it)
+- Set `SystemUiOverlayStyle` to match design header background (light/dark icons)
+- For content that scrolls: verify it doesn't overflow at 320px (iPhone SE) width
+- Add `resizeToAvoidBottomInset` for screens with input fields
+- Use `EdgeInsetsDirectional` instead of `EdgeInsets` for RTL support
+
+### 5b — Accessibility Pass
+
+Every screen must pass basic accessibility requirements:
+- Every `GestureDetector`/`InkWell` tap target >= 48x48 logical pixels
+- Every icon has a `semanticLabel` (or wrapped in `ExcludeSemantics` if decorative)
+- Every image has a `semanticLabel`
+- Use `InkWell` (not `GestureDetector`) for tap feedback on interactive elements
+- `MergeSemantics` for compound interactive widgets (icon + text = one tap target)
+- Text handles `MediaQuery.textScaleFactorOf(context)` up to 1.5x without overflow
+- Focus order is logical for screen reader traversal
+
+### 5c — State & Data Layer Pass
+
+Convert static mock data into production-ready architecture:
+- **Identify dynamic data**: which values come from API? (prices, user data, lists, counts)
+- **Generate data models**: for each data shape visible in design (e.g., `CoinListItem`)
+- **Parameterize widgets**: accept data via constructor, not hardcoded strings
+- **Generate repository stubs**: `abstract class XRepository { Future<List<X>> getAll(); }`
+- **Add loading/error/empty states**:
+  - Loading: skeleton shimmer or placeholder (even if not in Figma)
+  - Error: retry button + error message
+  - Empty: "No items" state for lists
+- **All visible text**: accept via constructor parameter (for future i18n)
+- Mark all static strings with `// TODO: localize` if project uses localization
+
+### 5d — Navigation Wiring (multi-screen only)
+
+If multiple screens are extracted:
+- Map navigation graph: which screen leads to which?
+- Register routes (GoRouter / Navigator for Flutter, Next.js App Router, React Navigation)
+- Wire bottom navigation bar with proper index state + tab persistence
+- Add `Hero` tags for elements shared between screens
+- Set up deep link configuration if applicable
+- Handle back navigation correctly per platform
+
+### 5e — Edge Case Hardening
+
+- Every `Text` with dynamic data: set `maxLines` + `overflow: TextOverflow.ellipsis`
+- Every list: handle 0 items (empty state), 1 item, many items
+- Every network image: add `errorWidget` and `placeholder`
+- Every tappable element: consider disabled state
+- Verify no overflow at extreme text lengths (2x English length for German)
+
+### 5f — Theme Integration
+
+- Wire colors through `ThemeData` / `ColorScheme` (not static `AppColors` class)
+- Access colors via `Theme.of(context)` in widgets
+- If Figma has dark + light variants: generate both themes
+- If only one variant: still wire through `ThemeData` for future theming
+- Generate `ThemeExtension` for custom tokens beyond Material's `ColorScheme`
+
+### 5g — Performance Review
+
+- Widget tree depth: flatten if >15 levels nested
+- `Column` with >5 homogeneous children → `ListView.builder`
+- All `const` constructors where possible
+- `RepaintBoundary` around scroll-independent expensive sections
+- Network images: `CachedNetworkImage` with appropriate cache dimensions
+- No unnecessary rebuilds: avoid `setState` in assembled screens
+
+---
+
+## Phase 6 — Checkpoint Before Next Screen
 
 After each screen:
 1. List all files created/modified
-2. Call out any deviations from the design
-3. **Pause. Wait for user to confirm** before starting the next screen
+2. List all data models and repository stubs generated
+3. Call out any deviations from the design
+4. Call out any production concerns flagged (missing states, accessibility gaps)
+5. **Pause. Wait for user to confirm** before starting the next screen
 
 ---
 
