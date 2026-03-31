@@ -106,15 +106,22 @@ export class TreeWalker {
     return chunks;
   }
 
+  // Only FRAME, INSTANCE, COMPONENT are meaningful chunk boundaries.
+  // VECTORs, GROUPs, TEXTs, etc. stay inside their parent chunk.
+  #isChunkable(node) {
+    return ['FRAME', 'INSTANCE', 'COMPONENT', 'COMPONENT_SET'].includes(node.type);
+  }
+
   #chunkNode(node, chunks, maxTokens) {
     const tokens = this.#estimateTokens(node);
 
-    if (tokens <= maxTokens || !(node.children && node.children.length > 0)) {
+    // Fits in one chunk, or not a chunkable type — keep as single chunk
+    if (tokens <= maxTokens || !this.#isChunkable(node) || !(node.children && node.children.length > 0)) {
       chunks.push({
         id: node.id,
         name: node.name,
         type: node.type,
-        isLeaf: !(node.children && node.children.length > 0),
+        isLeaf: true,
         parentId: this.#parentMap.get(node.id) || null,
         tokenEstimate: tokens,
         nodeData: node,
@@ -123,10 +130,40 @@ export class TreeWalker {
       return;
     }
 
+    // Too big — only split at chunkable children (FRAME/INSTANCE/COMPONENT)
     const childChunkIds = [];
+    const inlineChildren = []; // non-chunkable children stay in parent
+
     for (const child of node.children) {
-      this.#chunkNode(child, chunks, maxTokens);
-      childChunkIds.push(child.id);
+      if (this.#isChunkable(child) && this.#estimateTokens(child) > maxTokens / 4) {
+        // Large enough chunkable child — give it its own chunk
+        this.#chunkNode(child, chunks, maxTokens);
+        childChunkIds.push(child.id);
+      } else {
+        // Small or non-chunkable — stays inline in parent
+        inlineChildren.push(child);
+      }
+    }
+
+    // If nothing was split out, keep as a single chunk
+    if (childChunkIds.length === 0) {
+      chunks.push({
+        id: node.id,
+        name: node.name,
+        type: node.type,
+        isLeaf: true,
+        parentId: this.#parentMap.get(node.id) || null,
+        tokenEstimate: tokens,
+        nodeData: node,
+        childChunkIds: [],
+      });
+      return;
+    }
+
+    // Parent becomes assembly chunk with inline children kept
+    const parentData = { ...this.#stripChildren(node) };
+    if (inlineChildren.length > 0) {
+      parentData.children = inlineChildren;
     }
 
     chunks.push({
@@ -135,8 +172,8 @@ export class TreeWalker {
       type: node.type,
       isLeaf: false,
       parentId: this.#parentMap.get(node.id) || null,
-      tokenEstimate: this.#estimateTokens(this.#stripChildren(node)),
-      nodeData: this.#stripChildren(node),
+      tokenEstimate: this.#estimateTokens(parentData),
+      nodeData: parentData,
       childChunkIds,
     });
   }

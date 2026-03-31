@@ -101,45 +101,53 @@ async function main() {
   const imageIds = assetExporter.getImageNodeIds();
   console.log(`  Icons: ${iconIds.length} | Images: ${imageIds.length}`);
 
-  // Fetch screenshots for chunks
-  const chunkNodeIds = chunks.map(c => c.id);
-  console.log(`  Fetching ${chunkNodeIds.length} screenshots...`);
-  try {
-    const screenshotResult = await api.getImages(fileKey, [nodeId, ...chunkNodeIds], { format: 'png', scale: 2 });
-    for (const [id, url] of Object.entries(screenshotResult.images || {})) {
-      if (url) {
-        const idx = id === nodeId ? -1 : chunks.findIndex(c => c.id === id);
-        const fileName = id === nodeId
-          ? 'full-screen.png'
-          : `${String(idx + 1).padStart(3, '0')}-${slugify(chunks[idx]?.name || id)}.png`;
-        try {
-          await api.downloadImage(url, join(outDir, 'screenshots', fileName));
-        } catch (e) {
-          console.warn(`  Warning: Failed to download screenshot for ${id}: ${e.message}`);
-        }
-      }
-    }
-  } catch (e) {
-    console.warn(`  Warning: Screenshot fetch failed: ${e.message}. Continuing without screenshots.`);
-  }
-
-  // Export icons as SVG
-  if (iconIds.length > 0) {
-    console.log(`  Exporting ${iconIds.length} icons as SVG...`);
+  // Fetch screenshots for chunks (batch in groups of 50 to avoid URI too large)
+  const allScreenshotIds = [nodeId, ...chunks.map(c => c.id)];
+  const BATCH_SIZE = 50;
+  console.log(`  Fetching ${allScreenshotIds.length} screenshots in batches of ${BATCH_SIZE}...`);
+  for (let b = 0; b < allScreenshotIds.length; b += BATCH_SIZE) {
+    const batch = allScreenshotIds.slice(b, b + BATCH_SIZE);
     try {
-      const iconResult = await api.getImages(fileKey, iconIds, { format: 'svg' });
-      for (const entry of assetManifest.filter(a => a.type === 'icon')) {
-        const url = iconResult.images?.[entry.nodeId];
+      const screenshotResult = await api.getImages(fileKey, batch, { format: 'png', scale: 2 });
+      for (const [id, url] of Object.entries(screenshotResult.images || {})) {
         if (url) {
+          const idx = id === nodeId ? -1 : chunks.findIndex(c => c.id === id);
+          const fileName = id === nodeId
+            ? 'full-screen.png'
+            : `${String(idx + 1).padStart(3, '0')}-${slugify(chunks[idx]?.name || id)}.png`;
           try {
-            await api.downloadImage(url, entry.filePath);
+            await api.downloadImage(url, join(outDir, 'screenshots', fileName));
           } catch (e) {
-            console.warn(`  Warning: Failed to download icon ${entry.name}: ${e.message}`);
+            console.warn(`  Warning: Failed to download screenshot for ${id}: ${e.message}`);
           }
         }
       }
+      console.log(`    Batch ${Math.floor(b / BATCH_SIZE) + 1}/${Math.ceil(allScreenshotIds.length / BATCH_SIZE)} done`);
     } catch (e) {
-      console.warn(`  Warning: Icon export failed: ${e.message}. Continuing without icons.`);
+      console.warn(`  Warning: Screenshot batch failed: ${e.message}. Continuing.`);
+    }
+  }
+
+  // Export icons as SVG (batched)
+  if (iconIds.length > 0) {
+    console.log(`  Exporting ${iconIds.length} icons as SVG in batches of ${BATCH_SIZE}...`);
+    for (let b = 0; b < iconIds.length; b += BATCH_SIZE) {
+      const batch = iconIds.slice(b, b + BATCH_SIZE);
+      try {
+        const iconResult = await api.getImages(fileKey, batch, { format: 'svg' });
+        for (const entry of assetManifest.filter(a => a.type === 'icon')) {
+          const url = iconResult.images?.[entry.nodeId];
+          if (url) {
+            try {
+              await api.downloadImage(url, entry.filePath);
+            } catch (e) {
+              console.warn(`  Warning: Failed to download icon ${entry.name}: ${e.message}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`  Warning: Icon batch export failed: ${e.message}. Continuing.`);
+      }
     }
   }
 
