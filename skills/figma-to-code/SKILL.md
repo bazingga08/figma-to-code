@@ -540,32 +540,54 @@ testWidgets('WidgetName matches design', (tester) async {
 ```
 Run: `flutter test --update-goldens test/goldens/widget_name_test.dart`
 
-**4b — Compare: Read BOTH images**
+**4b — Compare using Claude Vision (primary comparator)**
 
-Read the two images:
-1. Figma screenshot: `.figma-extract/screenshots/<chunk>.png`
-2. Built screenshot: `test/goldens/widget_name.png`
+Read BOTH images simultaneously:
+1. Figma reference: `.figma-extract/screenshots/<chunk>.png` (pre-downloaded, consistent)
+2. Built component: `test/goldens/widget_name.png` (captured from golden test)
 
-Compare them visually. Check for:
-- Layout/spacing mismatches
-- Color differences
-- Typography issues (font size, weight, wrong font)
-- Missing elements or extra elements
-- Border radius, shadow, opacity differences
-- WRONG COMPONENT TYPE (tab bar rendered as buttons, list rendered as column)
-- Alignment issues
+**Why Claude Vision over pixel-diff tools:**
+- Flutter and Figma use different renderers (Skia vs Figma engine). Font rasterization,
+  anti-aliasing, and sub-pixel rendering ALWAYS differ. A pixel-perfect component will
+  still show 3-5% pixel diff from rendering noise alone.
+- Claude Vision understands semantic similarity: "same text, slightly different font hinting"
+  is a MATCH, not a mismatch. Pixel-diff would flag it as 5% different.
+- Claude Vision gives ACTIONABLE feedback: "padding-left is ~4px too wide" instead of
+  just "5.2% pixels differ."
+
+**Why pre-downloaded screenshots (not MCP `get_screenshot`):**
+- Already on disk from extraction — instant access, no API calls
+- Consistent rendering — same Figma server-side render for all chunks
+- Batch-fetched (50 at a time) — fast and reliable
+- If design was updated since extraction → re-run extractor, don't use stale screenshots
+
+Compare visually, checking:
+- Layout/spacing — padding, gap, alignment, width/height proportions
+- Colors — background, text, borders, shadows
+- Typography — font, weight, size, line height, letter spacing
+- Elements — missing, extra, wrong order
+- Shape — border radius, corners, shadows, opacity
+- Semantic correctness — IS it the right component type?
 
 **4c — Generate structured diff**
 
+For every visual property, explicitly state MATCH or MISMATCH:
+
 ```
-MATCH:    background color correct
-MATCH:    font family correct
-MISMATCH: padding-left should be 12px, appears larger (~16px)
-MISMATCH: border-radius missing on container
-MISMATCH: text color #A0AEC0 appears as #FFFFFF
-MISSING:  letterSpacing not applied
-MISSING:  shadow not applied
+MATCH:    layout direction (horizontal) ✓
+MATCH:    background color (#1B1E2D) ✓
+MATCH:    font family (Manrope) ✓
+MATCH:    font size (12px) ✓
+MISMATCH: padding-left should be 12px, appears ~16px → fix to 12
+MISMATCH: border-radius should be 8px, currently 0 → add borderRadius: 8
+MISMATCH: text color should be #A0AEC0, currently #FFFFFF → fix color
+MISSING:  letterSpacing: 0.2px not applied → add letterSpacing
+MISSING:  shadow (0,2,8,0 #00000014) not applied → add BoxShadow
+IGNORED:  font hinting difference (rendering noise, not a real mismatch)
 ```
+
+**Important:** Font rendering differences between Flutter and Figma are EXPECTED
+and should be marked IGNORED, not MISMATCH. Only flag actual style mismatches.
 
 **4d — Fix and re-verify**
 
