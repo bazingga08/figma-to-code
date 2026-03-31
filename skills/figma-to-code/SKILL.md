@@ -500,9 +500,55 @@ Before writing code, mentally go through EVERY property in the spec:
 - [ ] Opacity, blend mode, rotation
 - [ ] Clips content, overflow direction
 - [ ] Constraints, absolute positioning, min/max sizes
+- [ ] **Z-index / layering / stacking order** (see below)
 - [ ] Text: every single property (font, weight, size, lineHeight, letterSpacing,
       color, case, decoration, align, truncation, maxLines, italic)
 - [ ] Mixed text styles (characterStyleOverrides)
+
+**Z-Index / Layering / Stacking Order — critical for correct rendering:**
+
+Figma layers elements top-to-bottom in the panel (last child renders on top).
+Many designs rely on precise stacking:
+
+- **`pos: ABSOLUTE` children**: these are positioned OVER their siblings. In the
+  spec, look for `pos:ABSOLUTE` — these MUST use `Stack` + `Positioned` (Flutter),
+  `position: absolute` (React), or equivalent. They are NOT part of the auto-layout
+  flow. Common examples: status badges on cards, glow ellipses behind content,
+  gradient overlay rectangles, floating price indicators, blur rectangles.
+- **Child order = paint order**: in a `Stack`, the FIRST child in the spec is the
+  bottom layer, the LAST child is the top layer. Match this order exactly.
+- **Clip behavior**: `clip: true` on a parent means children that overflow are
+  clipped. Without it, absolute children can bleed outside the parent bounds.
+  Use `clipBehavior: Clip.hardEdge` (Flutter) or `overflow: hidden` (CSS).
+- **Elevation / shadows**: shadows in the spec imply visual depth. Elements with
+  shadows should appear to float above elements without shadows.
+- **Blur effects behind content**: `effects: [blur(Xpx)]` on a rectangle means
+  it's a backdrop blur or glow. These are often absolute-positioned with low
+  opacity, creating depth behind the main content.
+- **`isFixed` / fixed position**: elements marked `isFixed: true` or with
+  `constraints: v=BOTTOM` on the root frame should be fixed (not scroll).
+  Use `Positioned` within the scaffold, not inside `SingleChildScrollView`.
+
+**Common layering patterns in Figma designs:**
+```
+Card with status badge:
+  Stack [
+    Card content (fills parent)          ← bottom layer
+    Status badge (pos:ABSOLUTE, top:12)  ← floats on top
+  ]
+
+Section with glow:
+  Stack [
+    Glow ellipse (pos:ABSOLUTE, opacity:0.3, blur:31px)  ← behind
+    Content column                                         ← on top
+  ]
+
+Gradient overlay:
+  Stack [
+    Background rectangle (pos:ABSOLUTE, gradient fill)    ← behind
+    Foreground content                                    ← on top
+  ]
+```
 
 **If ANY style property exists in the spec, it MUST be in the code.**
 Missing a single `letterSpacing: 0.2` or `borderRadius: 8` makes it not match.
@@ -512,6 +558,7 @@ Missing a single `letterSpacing: 0.2` or `borderRadius: 8` makes it not match.
 - Use actual SVG icons from `.figma-extract/assets/` — never Material Icons
 - Map colors to project tokens — if no match, use the exact hex
 - Follow the semantic pattern identified in Phase 2.5
+- **Respect stacking order** — use Stack for absolute children, maintain paint order
 
 ### Step 3: Assemble Parents
 
@@ -729,6 +776,18 @@ SHAPE & DECORATION CHECKS:
 □ Gradient borders present where spec shows them (e.g., gold gradient border)
 □ Divider lines present with correct color and position
 □ Card border styles correct (solid vs gradient vs none)
+
+Z-INDEX / LAYERING / STACKING CHECKS:
+□ Absolute-positioned elements render ON TOP of their siblings (badges, overlays)
+□ Glow/blur ellipses render BEHIND content, not on top or missing
+□ Status badges on cards overlap the card edge correctly (not clipped or misplaced)
+□ Gradient overlay rectangles behind content sections are present and layered correctly
+□ Stack child order matches Figma layer order (first child = bottom, last = top)
+□ Clip behavior correct — overflow hidden where spec says clip:true
+□ Fixed elements (header, bottom nav) layer above scrollable content
+□ Floating indicators (price badges, dot markers) positioned over their context
+□ Cards with both absolute children AND auto-layout children render correctly
+□ Opacity on background layers doesn't bleed through incorrectly
 ```
 
 ### Step 3: Build the Comprehensive Diff
@@ -819,6 +878,11 @@ per-component verification missed:
 | Gradient border | First quick action chip missing gold gradient border |
 | Badge missing | "3 New" red badge on Strategies tab not rendered |
 | Decoration | Green glow ellipse behind announcement card positioned wrong |
+| Z-index/layering | Status badge (ATTENDING) should overlap card edge but was clipped by parent |
+| Z-index/layering | Glow ellipse rendered ON TOP of text instead of behind it (wrong Stack order) |
+| Z-index/layering | Gradient overlay rectangle (pos:ABSOLUTE) missing entirely — content has no depth |
+| Z-index/layering | Floating price indicator on chart not positioned over candles (missing Stack) |
+| Z-index/layering | Card clip:true was missing — absolute badge bled outside card bounds |
 
 ---
 
@@ -887,6 +951,14 @@ Run through this for every component before marking it done:
 - [ ] Interactive patterns correct (scrollable where needed)
 - [ ] List items use builder pattern, not hardcoded children
 - [ ] Navigation patterns use proper framework widgets
+
+**Z-Index / Layering / Stacking**
+- [ ] Absolute-positioned children use Stack + Positioned, not in flow
+- [ ] Stack child order matches Figma paint order (first = bottom, last = top)
+- [ ] Glow/blur elements behind content, not on top
+- [ ] Status badges overlay card edges correctly
+- [ ] clip:true containers use clipBehavior, preventing overflow bleed
+- [ ] Fixed elements (header/nav) stay above scroll content
 
 **Assets**
 - [ ] All icons from `.figma-extract/assets/` at exact size
