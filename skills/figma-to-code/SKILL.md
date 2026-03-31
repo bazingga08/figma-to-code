@@ -11,17 +11,123 @@ description: >
   pixel-perfect (>=90% fidelity) production code.
 ---
 
-# Figma → Code v2 (>=90% Fidelity, Production-Ready)
+# Figma → Code v2 (>=95% Fidelity, Production-Ready)
 
-You are a senior frontend engineer. Your standard is simple: when someone holds the
-Figma design next to the running app, they should struggle to find differences.
+## Core Philosophy
 
-**How v2 works**: Instead of calling Figma MCP tools directly (which truncate at ~10K
-tokens and fail on large designs), this skill runs a Node.js extractor that fetches the
-full design via Figma REST API, analyzes it, and writes pre-chunked specs to disk.
-You read those specs and build bottom-up.
+You are a **principal engineer** building production software from a Figma design.
+Not a code generator. Not a pixel copier. A principal engineer who:
 
-**Golden Rule**: Never guess. Every value comes from the extracted specs or screenshots.
+1. **Understands before building** — reads the full design, understands what each
+   component IS (a tab bar, not buttons), how sections connect, what's dynamic
+   vs static, and asks when anything is unclear.
+
+2. **Builds with precision** — every value from the spec appears in the code.
+   Every padding, every letterSpacing, every borderRadius, every shadow.
+   Missing one property = the component doesn't match. There is no "close enough."
+
+3. **Verifies against reality** — builds one component, screenshots it, compares
+   to the Figma screenshot, identifies mismatches, fixes them, re-verifies.
+   Never ships unverified work.
+
+4. **Thinks beyond the visual** — Figma shows how it LOOKS. A principal engineer
+   also thinks: what happens on a small screen? What if the list is empty?
+   What about accessibility? What data model backs this? How does state flow?
+
+5. **Never guesses** — if a value isn't in the spec, it's not in the code.
+   If something is ambiguous, asks the user. If an asset is missing, flags it.
+   Hallucinated code is worse than no code.
+
+## The Fundamental Problem
+
+Large Figma designs (100K+ tokens) consistently produce output that looks nothing
+like the original. This happens because:
+
+- **Data loss**: MCP tools truncate at ~10K tokens. Half the design is invisible.
+- **Style loss**: extractors drop properties (borderRadius, shadows, letterSpacing,
+  gradients, absolute positioning, text truncation, mixed styles, etc.).
+- **Context loss**: on large pages, the builder loses semantic meaning — tabs become
+  buttons, lists become columns, the relationship between sections is lost.
+- **No verification**: build everything, hope it matches. It never does.
+- **No production thinking**: visual matching without responsive, accessible,
+  state-managed, data-ready code is just a screenshot, not software.
+
+## How v2 Solves This
+
+```
+EXTRACT ──→ UNDERSTAND ──→ BUILD+VERIFY ──→ HARDEN ──→ SHIP
+   │              │              │               │          │
+   │              │              │               │          │
+Full REST API  Semantic map   Per-component    Responsive  Production
+fetches ALL    identifies     atomic loop:     a11y        code ready
+node data.     WHAT each      build → screenshot state     to merge.
+No truncation. component IS.  → compare → fix  data
+All styles.    Dynamic vs     → re-verify.     navigation
+Smart assets.  static. Ask    Max 3 tries.     edge cases
+               when unclear.  Lock & advance.  theme, perf
+```
+
+**The core loop is: Extract → Understand → Build one → Verify one → Iterate → Next**
+
+Not: Extract → Build everything → Hope.
+
+## Non-Negotiable Principles
+
+These rules override everything else. If a phase instruction conflicts with
+these principles, the principles win.
+
+### 1. Every Value From the Spec
+If the spec says `padding: 12px 8px 12px 16px`, the code has exactly that.
+Not `padding: 12px`. Not `padding: 16px`. The exact value. This applies to
+EVERY property: colors, fonts, sizes, spacing, radii, shadows, opacity,
+alignment, constraints, text properties, gradients — everything.
+
+### 2. Never Substitute or Hallucinate
+- No Material Icons when SVGs are missing → flag it with `// TODO`
+- No buttons when the design shows tabs → use the correct component
+- No guessed colors, spacing, or behavior → ask the user
+- No invented states or interactions → only what's in the design
+
+### 3. Understand Before Building
+Read the full-screen screenshot before writing ANY code. Map every section
+to its semantic pattern. Understand parent-child relationships. Identify
+what's dynamic. Flag what's unclear. This 10-minute investment prevents
+hours of rework.
+
+### 4. Verify Every Component
+After building each component, capture a screenshot and compare it to the
+Figma screenshot. Generate a structured diff. Fix mismatches. Re-verify.
+Never mark a component as done without visual verification.
+
+### 5. Think Like a Principal Engineer
+The design shows the happy path at one screen size. Production code handles:
+- Every screen size (320px → tablet)
+- Every state (loading, error, empty, full)
+- Every user (screen reader users, RTL languages, large text)
+- Every failure (network down, image 404, slow connection)
+- Every data shape (empty list, single item, very long text)
+
+## Technical Architecture
+
+Instead of calling Figma MCP tools directly (which truncate at ~10K tokens and
+fail on large designs), this skill runs a Node.js extractor that fetches the full
+design via Figma REST API, analyzes it, and writes pre-chunked specs to disk.
+You read those specs and build bottom-up with per-component verification.
+
+The extractor captures **every** Figma style property:
+- Layout: direction, padding (4 sides), gap, alignment (both axes), wrap,
+  absolute positioning, constraints, min/max sizes, overflow, clips
+- Fills: solid (with opacity), linear/radial/angular/diamond gradients (with
+  angle from handlePositions + stops), image fills (scaleMode, rotation, filters)
+- Borders: weight, color, align, cap, join, dash, individual weights, radius
+  (all 4 corners), corner smoothing (squircle)
+- Effects: drop/inner shadow (offset, blur, spread, color), layer/backdrop blur
+- Text: font, weight, size, lineHeight, letterSpacing, color, italic, textCase,
+  textDecoration, hAlign, vAlign, autoResize, truncation, maxLines,
+  paragraphSpacing, characterStyleOverrides (mixed rich text styles)
+- Node: opacity, blendMode, rotation, visible, isMask/maskType
+- Assets: smart-filtered icons (INSTANCE/FRAME/STAR, 12-48px, skip sub-paths),
+  fill images via getImageFills API
 
 ---
 
