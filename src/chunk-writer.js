@@ -15,6 +15,14 @@ export class ChunkWriter {
     return a < 1 ? `${hex}${toHex(a)}` : hex.toUpperCase();
   }
 
+  #formatGradientAngle(handles) {
+    if (!handles || handles.length < 2) return '';
+    const dx = handles[1].x - handles[0].x;
+    const dy = handles[1].y - handles[0].y;
+    const angle = Math.round(Math.atan2(dy, dx) * 180 / Math.PI + 90);
+    return `${((angle % 360) + 360) % 360}deg`;
+  }
+
   #formatColor(fill) {
     if (!fill) return '-';
     if (fill.type === 'SOLID' && fill.color) {
@@ -22,21 +30,37 @@ export class ChunkWriter {
       const a = (fill.color.a !== undefined ? fill.color.a : 1) * opacity;
       return this.#rgbaToHex(fill.color.r, fill.color.g, fill.color.b, a);
     }
-    if (fill.type === 'GRADIENT_LINEAR' && fill.gradientStops) {
+    // All gradient types with full stop data + angle
+    if (fill.gradientStops) {
       const stops = fill.gradientStops.map(s => {
         const c = s.color;
-        return `${this.#rgbaToHex(c.r, c.g, c.b, c.a)} ${Math.round(s.position * 100)}%`;
+        const opacity = fill.opacity !== undefined ? fill.opacity : 1;
+        return `${this.#rgbaToHex(c.r, c.g, c.b, c.a * opacity)} ${Math.round(s.position * 100)}%`;
       }).join(', ');
-      return `linear-gradient(${stops})`;
+      const angle = this.#formatGradientAngle(fill.gradientHandlePositions);
+
+      if (fill.type === 'GRADIENT_LINEAR') return `linear-gradient(${angle}, ${stops})`;
+      if (fill.type === 'GRADIENT_RADIAL') return `radial-gradient(${stops})`;
+      if (fill.type === 'GRADIENT_ANGULAR') return `conic-gradient(${angle}, ${stops})`;
+      if (fill.type === 'GRADIENT_DIAMOND') return `diamond-gradient(${angle}, ${stops})`;
     }
-    if (fill.type === 'GRADIENT_RADIAL' && fill.gradientStops) {
-      const stops = fill.gradientStops.map(s => {
-        const c = s.color;
-        return `${this.#rgbaToHex(c.r, c.g, c.b, c.a)} ${Math.round(s.position * 100)}%`;
-      }).join(', ');
-      return `radial-gradient(${stops})`;
+    if (fill.type === 'IMAGE') {
+      let s = `IMAGE (ref: ${fill.imageRef || '?'}`;
+      if (fill.scaleMode) s += `, scale: ${fill.scaleMode}`;
+      if (fill.rotation) s += `, rotation: ${fill.rotation}`;
+      if (fill.filters) {
+        const f = fill.filters;
+        const parts = [];
+        if (f.exposure) parts.push(`exposure:${f.exposure}`);
+        if (f.contrast) parts.push(`contrast:${f.contrast}`);
+        if (f.saturation) parts.push(`saturation:${f.saturation}`);
+        if (f.temperature) parts.push(`temperature:${f.temperature}`);
+        if (f.tint) parts.push(`tint:${f.tint}`);
+        if (parts.length) s += `, filters: ${parts.join(' ')}`;
+      }
+      s += ')';
+      return s;
     }
-    if (fill.type === 'IMAGE') return `IMAGE (ref: ${fill.imageRef || '?'})`;
     return fill.type;
   }
 
@@ -95,22 +119,53 @@ export class ChunkWriter {
       md += `- Main axis align: ${node.primaryAxisAlignItems || 'MIN'}\n`;
       md += `- Cross axis align: ${node.counterAxisAlignItems || 'MIN'}\n`;
       if (node.layoutWrap) md += `- Wrap: ${node.layoutWrap}\n`;
+      if (node.counterAxisSpacing) md += `- Cross axis gap: ${node.counterAxisSpacing}px\n`;
+      if (node.counterAxisAlignContent) md += `- Cross axis content: ${node.counterAxisAlignContent}\n`;
     }
     if (node.layoutAlign) md += `- Layout align: ${node.layoutAlign}\n`;
     if (node.layoutGrow) md += `- Layout grow: ${node.layoutGrow}\n`;
 
+    // Responsive constraints
+    if (node.minWidth) md += `- Min width: ${node.minWidth}px\n`;
+    if (node.maxWidth) md += `- Max width: ${node.maxWidth}px\n`;
+    if (node.minHeight) md += `- Min height: ${node.minHeight}px\n`;
+    if (node.maxHeight) md += `- Max height: ${node.maxHeight}px\n`;
+
+    // Constraints (for non-auto-layout positioning)
+    if (node.constraints) {
+      md += `- Constraints: h=${node.constraints.horizontal}, v=${node.constraints.vertical}\n`;
+    }
+
+    // Absolute positioning
+    if (node.layoutPositioning === 'ABSOLUTE') {
+      md += `- Positioning: ABSOLUTE\n`;
+    }
+
     // Clips / overflow
     if (node.clipsContent) md += `- Clips content: true\n`;
+    if (node.overflowDirection) md += `- Overflow: ${node.overflowDirection}\n`;
+
+    // Visibility
+    if (node.visible === false) md += `- Visible: false\n`;
 
     // Opacity
     if (node.opacity !== undefined && node.opacity !== 1) {
       md += `- Opacity: ${node.opacity}\n`;
     }
 
+    // Rotation
+    if (node.rotation) md += `- Rotation: ${node.rotation}deg\n`;
+
     // Blend mode
     if (node.blendMode && node.blendMode !== 'PASS_THROUGH' && node.blendMode !== 'NORMAL') {
       md += `- Blend mode: ${node.blendMode}\n`;
     }
+
+    // Corner smoothing (squircle)
+    if (node.cornerSmoothing) md += `- Corner smoothing: ${node.cornerSmoothing}\n`;
+
+    // Mask
+    if (node.isMask) md += `- Is mask: true (type: ${node.maskType || 'ALPHA'})\n`;
 
     // Fills
     const visibleFills = (node.fills || []).filter(f => f.visible !== false);
@@ -130,8 +185,10 @@ export class ChunkWriter {
       }
       if (node.strokeWeight) md += `- Weight: ${node.strokeWeight}px\n`;
       if (node.strokeAlign) md += `- Align: ${node.strokeAlign}\n`;
-      if (node.dashPattern && node.dashPattern.length > 0) {
-        md += `- Dash: ${node.dashPattern.join(', ')}\n`;
+      if (node.strokeCap && node.strokeCap !== 'NONE') md += `- Cap: ${node.strokeCap}\n`;
+      if (node.strokeJoin && node.strokeJoin !== 'MITER') md += `- Join: ${node.strokeJoin}\n`;
+      if ((node.strokeDashes || node.dashPattern) && (node.strokeDashes || node.dashPattern).length > 0) {
+        md += `- Dash: ${(node.strokeDashes || node.dashPattern).join(', ')}\n`;
       }
       if (node.individualStrokeWeights) {
         const sw = node.individualStrokeWeights;
@@ -164,16 +221,20 @@ export class ChunkWriter {
   #renderChildren(children, depth) {
     let md = '';
     const indent = '  '.repeat(depth);
+    let num = 0;
     for (let i = 0; i < children.length; i++) {
       const child = children[i];
-      const num = `${i + 1}.`;
+      // Skip invisible nodes
+      if (child.visible === false) continue;
+      num++;
+      const label = `${num}.`;
 
       if (child.type === 'TEXT') {
-        md += this.#renderTextNode(child, indent, num);
+        md += this.#renderTextNode(child, indent, label);
       } else if (child.type === 'INSTANCE') {
-        md += this.#renderInstanceNode(child, indent, num);
+        md += this.#renderInstanceNode(child, indent, label);
       } else {
-        md += this.#renderFrameNode(child, indent, num, depth);
+        md += this.#renderFrameNode(child, indent, label, depth);
       }
     }
     return md;
@@ -181,39 +242,65 @@ export class ChunkWriter {
 
   #renderTextNode(child, indent, num) {
     const s = child.style || {};
-    const color = (child.fills && child.fills[0]) ? this.#formatColor(child.fills[0]) : '-';
+    // Use style-level fills first, then node-level fills
+    const fills = (s.fills && s.fills.length > 0) ? s.fills : child.fills;
+    const color = (fills && fills[0]) ? this.#formatColor(fills[0]) : '-';
 
     let md = `${indent}${num} **${child.name}**: TEXT "${child.characters}"`;
-    md += ` | ${s.fontFamily || '?'} ${s.fontWeight || '?'} ${s.fontSize || '?'}px`;
+    md += ` | ${s.fontFamily || '?'}`;
+    if (s.italic) md += ' italic';
+    md += ` ${s.fontWeight || '?'} ${s.fontSize || '?'}px`;
     md += `/${s.lineHeightPx != null ? s.lineHeightPx + 'px' : 'auto'}`;
     md += ` ${color}`;
 
-    // Letter spacing — critical for matching
-    if (s.letterSpacing && s.letterSpacing !== 0) {
-      md += ` ls:${s.letterSpacing}px`;
-    }
+    // Letter spacing
+    if (s.letterSpacing && s.letterSpacing !== 0) md += ` ls:${s.letterSpacing}px`;
 
     // Text decoration
-    if (s.textDecoration && s.textDecoration !== 'NONE') {
-      md += ` decoration:${s.textDecoration}`;
-    }
+    if (s.textDecoration && s.textDecoration !== 'NONE') md += ` decoration:${s.textDecoration}`;
 
-    // Text case
-    if (s.textCase && s.textCase !== 'ORIGINAL') {
-      md += ` case:${s.textCase}`;
-    }
+    // Text case (UPPER, LOWER, TITLE, SMALL_CAPS, etc.)
+    if (s.textCase && s.textCase !== 'ORIGINAL') md += ` case:${s.textCase}`;
 
-    // Text align
-    if (s.textAlignHorizontal && s.textAlignHorizontal !== 'LEFT') {
-      md += ` align:${s.textAlignHorizontal}`;
-    }
+    // Horizontal align
+    if (s.textAlignHorizontal && s.textAlignHorizontal !== 'LEFT') md += ` hAlign:${s.textAlignHorizontal}`;
 
-    // Opacity on text node
-    if (child.opacity !== undefined && child.opacity !== 1) {
-      md += ` opacity:${child.opacity}`;
-    }
+    // Vertical align
+    if (s.textAlignVertical && s.textAlignVertical !== 'TOP') md += ` vAlign:${s.textAlignVertical}`;
+
+    // Text auto-resize (NONE = fixed box, HEIGHT = auto height, WIDTH_AND_HEIGHT = hug)
+    if (s.textAutoResize && s.textAutoResize !== 'NONE') md += ` autoResize:${s.textAutoResize}`;
+
+    // Truncation + max lines
+    if (child.textTruncation && child.textTruncation !== 'DISABLED') md += ` truncate:${child.textTruncation}`;
+    if (child.maxLines) md += ` maxLines:${child.maxLines}`;
+
+    // Paragraph spacing
+    if (s.paragraphSpacing) md += ` paraSpacing:${s.paragraphSpacing}px`;
+
+    // Opacity
+    if (child.opacity !== undefined && child.opacity !== 1) md += ` opacity:${child.opacity}`;
 
     md += '\n';
+
+    // Mixed styles (characterStyleOverrides) — critical for rich text
+    if (child.characterStyleOverrides && child.characterStyleOverrides.length > 0 && child.styleOverrideTable) {
+      const overrides = Object.entries(child.styleOverrideTable);
+      if (overrides.length > 0) {
+        md += `${indent}  *Mixed styles:*\n`;
+        for (const [key, override] of overrides) {
+          const parts = [];
+          if (override.fontFamily) parts.push(override.fontFamily);
+          if (override.fontWeight) parts.push(`w${override.fontWeight}`);
+          if (override.fontSize) parts.push(`${override.fontSize}px`);
+          if (override.italic) parts.push('italic');
+          if (override.fills && override.fills[0]) parts.push(this.#formatColor(override.fills[0]));
+          if (override.textDecoration) parts.push(override.textDecoration);
+          if (parts.length) md += `${indent}  - override[${key}]: ${parts.join(' ')}\n`;
+        }
+      }
+    }
+
     return md;
   }
 
@@ -290,13 +377,40 @@ export class ChunkWriter {
 
     // Clips content
     if (child.clipsContent) md += ` clip:true`;
+    if (child.overflowDirection) md += ` overflow:${child.overflowDirection}`;
 
     // Layout sizing
     if (child.layoutSizingHorizontal === 'FILL') md += ` w:FILL`;
+    if (child.layoutSizingHorizontal === 'HUG') md += ` w:HUG`;
     if (child.layoutSizingVertical === 'FILL') md += ` h:FILL`;
+    if (child.layoutSizingVertical === 'HUG') md += ` h:HUG`;
 
-    // Layout grow
+    // Layout grow + align
     if (child.layoutGrow) md += ` grow:${child.layoutGrow}`;
+    if (child.layoutAlign && child.layoutAlign !== 'INHERIT') md += ` align:${child.layoutAlign}`;
+
+    // Absolute positioning within auto-layout parent
+    if (child.layoutPositioning === 'ABSOLUTE') md += ` pos:ABSOLUTE`;
+
+    // Constraints
+    if (child.constraints) {
+      md += ` constraints:h=${child.constraints.horizontal},v=${child.constraints.vertical}`;
+    }
+
+    // Min/max size
+    if (child.minWidth) md += ` minW:${child.minWidth}`;
+    if (child.maxWidth) md += ` maxW:${child.maxWidth}`;
+    if (child.minHeight) md += ` minH:${child.minHeight}`;
+    if (child.maxHeight) md += ` maxH:${child.maxHeight}`;
+
+    // Rotation
+    if (child.rotation) md += ` rotate:${child.rotation}deg`;
+
+    // Corner smoothing
+    if (child.cornerSmoothing) md += ` smooth:${child.cornerSmoothing}`;
+
+    // Mask
+    if (child.isMask) md += ` mask:${child.maskType || 'ALPHA'}`;
 
     md += '\n';
 

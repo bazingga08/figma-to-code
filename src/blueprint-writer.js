@@ -97,9 +97,9 @@ export class BlueprintWriter {
 
     md += '\n### Typography\n\n';
     if (typography.length) {
-      md += '| Font | Weight | Size | Line Height |\n|---|---|---|---|\n';
+      md += '| Font | Weight | Size | Line Height | Letter Spacing | Italic | Case |\n|---|---|---|---|---|---|---|\n';
       for (const t of typography) {
-        md += `| ${t.fontFamily} | ${t.fontWeight} | ${t.fontSize}px | ${t.lineHeight ? t.lineHeight + 'px' : 'auto'} |\n`;
+        md += `| ${t.fontFamily} | ${t.fontWeight} | ${t.fontSize}px | ${t.lineHeight ? t.lineHeight + 'px' : 'auto'} | ${t.letterSpacing || 0}px | ${t.italic ? 'yes' : '-'} | ${t.textCase !== 'ORIGINAL' ? t.textCase : '-'} |\n`;
       }
     } else {
       md += 'No typography extracted.\n';
@@ -107,6 +107,27 @@ export class BlueprintWriter {
 
     md += '\n### Spacing Scale\n\n';
     md += spacing.length ? spacing.map(s => `\`${s}px\``).join(', ') : 'No spacing extracted.';
+
+    const radii = tokens.radii || [];
+    if (radii.length) {
+      md += '\n\n### Border Radius Scale\n\n';
+      md += radii.map(r => `\`${r}px\``).join(', ');
+    }
+
+    const shadows = tokens.shadows || [];
+    if (shadows.length) {
+      md += '\n\n### Shadows\n\n';
+      md += '| Type | Offset | Blur | Spread | Color | Uses |\n|---|---|---|---|---|---|\n';
+      for (const s of shadows) {
+        md += `| ${s.type} | ${s.offsetX},${s.offsetY} | ${s.blur}px | ${s.spread}px | ${s.color} | ${s.usageCount}x |\n`;
+      }
+    }
+
+    const borderWidths = tokens.borderWidths || [];
+    if (borderWidths.length) {
+      md += '\n\n### Border Widths\n\n';
+      md += borderWidths.map(w => `\`${w}px\``).join(', ');
+    }
 
     return md;
   }

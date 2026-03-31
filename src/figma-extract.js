@@ -91,7 +91,10 @@ async function main() {
   const colors = tokenExtractor.getColors();
   const typography = tokenExtractor.getTypography();
   const spacing = tokenExtractor.getSpacing();
-  console.log(`  Colors: ${colors.length} | Typography combos: ${typography.length} | Spacing values: ${spacing.length}`);
+  const radii = tokenExtractor.getRadii();
+  const shadows = tokenExtractor.getShadows();
+  const borderWidths = tokenExtractor.getBorderWidths();
+  console.log(`  Colors: ${colors.length} | Typography: ${typography.length} | Spacing: ${spacing.length} | Radii: ${radii.length} | Shadows: ${shadows.length} | Borders: ${borderWidths.length}`);
 
   // 5. Asset inventory & download
   console.log('\n[5/6] Building asset inventory...');
@@ -183,7 +186,7 @@ async function main() {
     hierarchy,
     buildOrder,
     reusables,
-    tokens: { colors, typography, spacing },
+    tokens: { colors, typography, spacing, radii, shadows, borderWidths },
     assetManifest,
   });
   await writeFile(join(outDir, 'blueprint.md'), blueprint.generate());
