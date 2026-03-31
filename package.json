@@ -1,0 +1,6 @@
+{
+  "name": "figma-to-code",
+  "version": "1.0.0",
+  "description": "Figma to pixel-perfect code skill for Claude Code. Supports React, React Native, and Flutter with adaptive recursive decomposition for complex designs.",
+  "type": "module"
+}
