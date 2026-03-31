@@ -1,0 +1,10 @@
+{
+  "name": "figma-to-code",
+  "description": "Convert Figma designs to pixel-perfect production code. Supports React, React Native, and Flutter with adaptive recursive decomposition for complex designs.",
+  "version": "1.0.0",
+  "author": {
+    "name": "bazingga08"
+  },
+  "repository": "https://github.com/bazingga08/figma-to-code",
+  "license": "MIT"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "figma-to-code",
+  "owner": {
+    "name": "bazingga08"
+  },
+  "plugins": [
+    {
+      "name": "figma-to-code",
+      "source": "./",
+      "description": "Convert Figma designs to pixel-perfect React, React Native, or Flutter code with adaptive recursive decomposition",
+      "version": "1.0.0"
+    }
+  ]
+}
