@@ -218,6 +218,13 @@ semantic-named FRAMEs at icon sizes (12-48px), and STAR nodes. It skips junk
 sub-paths (Vector, Rectangle, Line, path* nodes inside compound shapes/groups).
 This typically reduces exports from thousands of nodes to ~10-30 real icons.
 
+**Layering data in output**: The chunk specs include `pos:ABSOLUTE` for elements
+that overlay siblings, `clip:true` for containers that clip overflow, `isFixed`
+for elements pinned to viewport, and `constraints` for positioning rules. These
+are critical for correct rendering — they determine Stack vs Column/Row,
+clipBehavior, and fixed vs scrolling placement. Pay attention to these during
+Phase 2 reading, not just during Phase 3 building.
+
 If the extractor fails, check:
 1. Is `$FIGMA_ACCESS_TOKEN` set?
 2. Is the file key / node ID correct?
@@ -283,6 +290,14 @@ Screen (Futures/Home)                    ← you read this FIRST
 By reading top-down, you capture the CONTEXT that each component exists within.
 The CoinTabs component isn't just "a row of pills" — it's the selector that
 controls which coin the chart and trade buttons show. That context matters.
+
+**While reading the tree, identify layering relationships:**
+- Look for `pos:ABSOLUTE` in the chunk specs — these are elements that OVERLAY
+  their siblings (badges, glow effects, gradient backgrounds, floating indicators)
+- Look for `clip:true` — these parents clip overflowing children
+- Note which elements are `isFixed` — they stay in place while content scrolls
+- In the tree structure, children listed AFTER siblings paint ON TOP of them
+- Mark every layering relationship you find — you'll need Stack/Positioned for these
 
 ### Step 3: Chunk Sizing Rule
 
@@ -356,6 +371,10 @@ Example:
 - Horizontal scrollable cards with tags → CAROUSEL CARDS
 - Fixed bar at bottom with icons + labels → BOTTOM NAVIGATION BAR
 - Grid of small icon+text items → QUICK ACTION GRID
+- Badge overlapping card corner → STACK with ABSOLUTE positioned badge
+- Blurred circle behind section content → STACK with background glow layer
+- Gradient rectangle behind text → STACK with gradient overlay behind content
+- Floating price label on chart → STACK with positioned indicator
 ```
 
 **Rules:**
@@ -364,33 +383,49 @@ Example:
 - A bottom nav is a bottom nav — use BottomNavigationBar or equivalent
 - A horizontal scroller is a horizontal scroller — use ListView horizontal
 - Cards are cards, chips are chips, badges are badges — use correct semantics
+- An absolute-positioned overlay IS a Stack — never flatten it into the flow
 
-### Step 2: Map Parent-Child Relationships
+### Step 2: Map Parent-Child & Layering Relationships
 
-Understand how sections CONNECT. The full page has a flow and hierarchy:
-- What scrolls? What's fixed?
+Understand how sections CONNECT and how they LAYER. The full page has flow,
+hierarchy, AND depth:
+- What scrolls? What's fixed? (fixed = different z-layer)
 - Which sections are siblings? Which are nested?
 - Where are dividers? What's the visual rhythm?
 - What's the tab content vs. tab bar vs. page scaffold?
+- **What overlaps?** Which elements sit ON TOP of others?
+- **What's behind?** Which elements are background/decoration layers?
+- **What clips?** Which containers hide overflow from children?
 
-Write this semantic map BEFORE building. Example:
+Write this semantic map BEFORE building, annotating layering with `[STACK]`,
+`[ABSOLUTE]`, `[FIXED]`, and `[CLIPS]`:
 
 ```
 Scaffold
-├─ Fixed: TopHeader (app bar)
+├─ [FIXED] TopHeader (app bar) — stays above scroll content
 ├─ Scrollable body:
 │  ├─ P&L gradient section
+│  │  └─ [STACK] gradient rect [ABSOLUTE behind] + content on top
 │  ├─ Explore/Strategies TAB BAR (2 tabs)
 │  ├─ Quick actions HORIZONTAL SCROLL
 │  ├─ Announcements section (header + HORIZONTAL CARD SCROLL)
+│  │  └─ Each card: [STACK] glow ellipse [ABSOLUTE behind] + card content
 │  ├─ Divider
 │  ├─ Start Trading (header + COIN TAB BAR + chart + buttons)
+│  │  └─ Chart: [STACK] grid lines + candles + floating price badge [ABSOLUTE]
 │  ├─ Watchlist TAB BAR (5 tabs)
 │  ├─ Coin LIST (5 rows)
 │  ├─ View All button
 │  └─ Contests (header + HORIZONTAL CARD SCROLL)
-└─ Fixed: Bottom NAVIGATION BAR (5 items)
+│     └─ Each card: [STACK] card content + status badge [ABSOLUTE top-left]
+│                    [CLIPS] card container clips image overflow
+└─ [FIXED] Bottom NAVIGATION BAR (5 items) — stays above scroll content
+   └─ [STACK] angled polygon bg [painted] + nav items on top
 ```
+
+**Every `pos:ABSOLUTE` in the spec = a Stack in code. Missing this = wrong layout.**
+**Every `clip:true` = clipBehavior on the container. Missing this = visual bleed.**
+**Every `isFixed` or constraint to TOP/BOTTOM = positioned outside scroll.**
 
 ### Step 3: Identify Dynamic vs Static Content
 
