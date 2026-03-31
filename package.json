@@ -1,6 +1,13 @@
 {
   "name": "figma-to-code",
-  "version": "1.0.0",
-  "description": "Figma to pixel-perfect code skill for Claude Code. Supports React, React Native, and Flutter with adaptive recursive decomposition for complex designs.",
-  "type": "module"
+  "version": "2.0.0",
+  "description": "Figma to pixel-perfect code skill for Claude Code. Pre-extracts design data via REST API for reliable handling of any design size.",
+  "type": "module",
+  "bin": {
+    "figma-extract": "./src/figma-extract.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "extract": "node src/figma-extract.js"
+  }
 }
