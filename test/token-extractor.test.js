@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { TokenExtractor } from '../src/token-extractor.js';
 
 const fixture = JSON.parse(readFileSync('test/fixtures/figma-response.json', 'utf8'));
-const nodeData = fixture.nodes['13766:373151'];
+const nodeData = fixture.nodes['1:100'];
 const rootDoc = nodeData.document;
 const stylesMap = nodeData.styles;
 

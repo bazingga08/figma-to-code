@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { AssetExporter } from '../src/asset-exporter.js';
 
 const fixture = JSON.parse(readFileSync('test/fixtures/figma-response.json', 'utf8'));
-const rootDoc = fixture.nodes['13766:373151'].document;
+const rootDoc = fixture.nodes['1:100'].document;
 
 describe('AssetExporter', () => {
   it('finds vector/icon nodes for export', () => {

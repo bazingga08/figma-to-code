@@ -1,19 +1,18 @@
-// test/tree-walker.test.js
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { TreeWalker } from '../src/tree-walker.js';
 
 const fixture = JSON.parse(readFileSync('test/fixtures/figma-response.json', 'utf8'));
-const rootDoc = fixture.nodes['13766:373151'].document;
+const rootDoc = fixture.nodes['1:100'].document;
 
 describe('TreeWalker', () => {
   it('builds hierarchy from root node', () => {
     const walker = new TreeWalker(rootDoc);
     const hierarchy = walker.getHierarchy();
 
-    assert.equal(hierarchy.id, '13766:373151');
-    assert.equal(hierarchy.name, 'Futures/Home');
+    assert.equal(hierarchy.id, '1:100');
+    assert.equal(hierarchy.name, 'App/Home');
     assert.equal(hierarchy.type, 'FRAME');
     assert.ok(hierarchy.children.length > 0);
   });
@@ -33,7 +32,7 @@ describe('TreeWalker', () => {
   it('determines layout properties for frames', () => {
     const walker = new TreeWalker(rootDoc);
     const layouts = walker.getLayoutMap();
-    const rootLayout = layouts['13766:373151'];
+    const rootLayout = layouts['1:100'];
     assert.ok(rootLayout, 'Root node should have layout info');
     assert.ok('width' in rootLayout);
     assert.ok('height' in rootLayout);
@@ -43,7 +42,6 @@ describe('TreeWalker', () => {
     const walker = new TreeWalker(rootDoc);
     const order = walker.getBuildOrder();
     assert.ok(order.length > 0);
-    // Leaves should come before their parents
     const idToIndex = new Map(order.map((item, i) => [item.id, i]));
     for (const item of order) {
       if (item.parentId && idToIndex.has(item.parentId)) {
