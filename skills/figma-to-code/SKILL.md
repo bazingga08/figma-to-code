@@ -816,6 +816,81 @@ Present complete build results with evidence:
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
+### User Feedback — Two-Channel System
+
+Two simultaneous feedback channels run throughout the build:
+
+**Channel 1: Terminal Stream (always visible)**
+Real-time compact log of every agent action:
+```
+[time] Wave N | Component | 🔨 Builder reading spec / writing code
+[time] Wave N | Component | 🔍 Verifier checking (layer 1 / layer 2)
+[time] Wave N | Component | ✅ PASS (iter N) / ❌ FAIL → Builder (iter N+1)
+[time] Wave N | Component | ⚠️ Missing asset / ❓ Unclear spec / 🚨 Escalation
+```
+
+After each wave, print grouped summary table:
+```
+[time] ═══ WAVE N COMPLETE ═══
+       ┌──────────────────┬──────┬──────────┬───────────────────┐
+       │ Component        │ Iter │ Critical │ Status            │
+       ├──────────────────┼──────┼──────────┼───────────────────┤
+       │ PnlSection       │ 1    │ 0        │ ✅ LOCKED          │
+       │ QuickActions     │ 3    │ 4        │ ✅ LOCKED          │
+       └──────────────────┴──────┴──────────┴───────────────────┘
+       Progress: X/Y locked │ Next: Wave N+1
+```
+
+**Channel 2: Evidence Board (on key events)**
+Full visual proof with Figma screenshots. Shown when:
+- Component PASS → verification table + Figma screenshot (proof of correctness)
+- Component FAIL → mismatches + Figma screenshot (what's being fixed)
+- Escalation → full history + screenshots + options for user
+- Wave complete → wave summary table
+- Build complete → full stats + issue category breakdown
+
+**On PASS — show the proof:**
+Read the Figma chunk screenshot using Read tool (displays inline).
+Show the complete spec-code verification table with all ✓.
+Show visual diff summary (0 critical, N minor).
+
+**On FAIL — show the evidence:**
+Read the Figma chunk screenshot using Read tool.
+For each CRITICAL mismatch, show:
+- What Figma shows (from screenshot)
+- What the code produces (from code analysis)
+- What needs to change (specific fix instruction)
+
+**On Escalation — show everything:**
+Figma screenshot, iteration history (what was tried and fixed each time),
+remaining issues, and clear options for the user.
+
+**Figma screenshots are ALWAYS included** in evidence boards using the Read
+tool on the .png files — the user sees the actual Figma render inline, not
+just a file path or text description.
+
+### Questioning Protocol
+
+The skill behaves like the best frontend engineer on the team.
+A great FE engineer doesn't just execute — they question, clarify, and push back.
+
+**ALWAYS question when:**
+- Spec contradicts screenshot → "Spec says X, screenshot shows Y. Which should I follow?"
+- Asset is missing → "Icon [name] not exported. Add TODO or export manually?"
+- Component type is ambiguous → "Is this a tab bar or a button group?"
+- Behavior is unclear → "What happens when this list has 0 items? 100 items?"
+- Gradient/effect can't be exactly reproduced → "This angular gradient needs approximation. Acceptable?"
+
+**ALWAYS explain decisions:**
+- "Using Expanded because spec says w:FILL"
+- "Not rendering stroke #000000 because visible:false in spec"
+- "Using gold text (#CDA953) for View All because spec fills show this color"
+
+**NEVER do silently:**
+- Substitute an icon
+- Approximate a position
+- Skip a property
+- Change a sizing mode
 
 ---
 
