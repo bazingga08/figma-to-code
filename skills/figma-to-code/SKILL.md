@@ -924,6 +924,10 @@ A great FE engineer doesn't just execute — they question, clarify, and push ba
 
 Run through this for every component before marking it done:
 
+> **Note:** This checklist is enforced by the Verifier agent during Phase 3.
+> It is listed here as the reference standard. The Verifier produces a
+> spec-code table covering every item below for every component.
+
 **Spacing & Layout**
 - [ ] Layout direction correct (HORIZONTAL=Row, VERTICAL=Column, NONE=Stack)
 - [ ] Every padding matches spec exactly — all 4 sides (no rounding)
@@ -966,6 +970,8 @@ Run through this for every component before marking it done:
 - [ ] Corner smoothing (squircle) applied where specified
 - [ ] Stroke cap (BUTT/ROUND/SQUARE) and join (BEVEL/MITER/ROUND) correct
 - [ ] Dashed/dotted borders with correct dash pattern
+- [ ] Stroke visibility: only render strokes with visible:true
+- [ ] Multiple strokes: render all visible strokes, not just the first
 - [ ] Drop shadow: x-offset, y-offset, blur, spread, color (all 5)
 - [ ] Inner shadow (inset): separate from drop shadow, different visual effect
 - [ ] Blur effects: layer blur vs backdrop blur, correct radius
