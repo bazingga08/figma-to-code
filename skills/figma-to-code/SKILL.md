@@ -686,6 +686,137 @@ Does NOT look at the code or spec — only the verifier's report.
   A) Continue iterating  B) Skip  C) Show screenshots  D) Keep trying
 
 
+### Execution Flow
+
+#### Step 0: Pre-Flight
+
+Before any trios launch, the orchestrator does:
+
+1. **Asset inventory:** Cross-reference every icon/image in the blueprint against
+   exported assets. Report missing assets to user upfront:
+   ```
+   Asset Check:
+   ✓ 12/14 icons exported as SVG
+   ✗ 2 icons missing (Telegram vector, Scalper lines)
+   Options: A) Add TODO placeholders  B) Export manually from Figma
+   ```
+   Wait for user decision.
+
+2. **Wave planning:** Group leaf components into waves of 3. Show the plan:
+   ```
+   Build Plan:
+   ════════════════════════════════════════
+   Reusables (sequential): 4 components
+   Wave 1 (parallel): PnlSection, QuickActions, AnnouncementCard
+   Wave 2 (parallel): CoinTab, PriceInfo, CandlestickChart
+   Wave 3 (parallel): TradeButtons, WatchlistTabs, CoinListRow
+   Wave 4 (parallel): ContestCard, BottomNav, Header
+   Assembly 1: StartTradingSection (depends on Wave 2+3)
+   Assembly 2: WatchlistSection (depends on Wave 3)
+   Assembly 3: ContestsSection (depends on Wave 4)
+   Final: FuturesHomeScreen (depends on all)
+   ════════════════════════════════════════
+   Proceed?
+   ```
+   Wait for user confirmation.
+
+#### Step 1: Build Reusables (sequential trios)
+
+Each reusable component goes through B→V→G one at a time (sequential because
+later components may reference them).
+
+For each reusable in `reusables/`:
+1. Launch Builder agent with reusable spec + screenshot
+2. Builder writes component → passes to Verifier
+3. Verifier produces report → passes to Gatekeeper
+4. Gatekeeper: PASS → lock. FAIL → fix list back to Builder.
+5. Loop until PASS or iteration 5 (escalate).
+
+Report to user after each reusable:
+```
+Reusable 1/4: CoinLogo
+  iter 1: Builder wrote → Verifier found 2 critical → FAIL
+  iter 2: Builder fixed → Verifier found 0 critical → PASS
+  ✅ CoinLogo LOCKED (2 iterations)
+```
+
+#### Step 2: Wave Execution of Leaves (parallel trios, 3 at a time)
+
+Group leaf chunks (no children) into batches of 3. Launch 3 trios in parallel.
+Each trio runs in a git worktree for file isolation.
+
+**Parallel trio launch pattern (using Agent tool):**
+Launch 3 agents simultaneously, each containing the full B→V→G loop for one component.
+Each agent:
+1. Reads its chunk spec + screenshot
+2. Runs B→V→G loop (max 5 iterations)
+3. Returns: locked component file OR escalation request
+
+**Wave completion summary:**
+```
+┌──────────────────┬──────┬──────────┬────────────────────────────┐
+│ Component        │ Iter │ Critical │ What Was Fixed             │
+├──────────────────┼──────┼──────────┼────────────────────────────┤
+│ PnlSection       │ 1    │ 0        │ —                          │
+│ QuickActions     │ 2    │ 3        │ icons, gradient border, gap│
+│ AnnouncementCard │ 2    │ 1        │ glow ellipse position      │
+└──────────────────┴──────┴──────────┴────────────────────────────┘
+Progress: 3/16 locked │ Next: Wave 2
+```
+
+#### Step 3: Assembly Waves (sequential trios, parents after children)
+
+Once ALL children of a parent are locked, the parent goes through its own B→V→G trio.
+
+The Verifier at assembly level checks TWO things:
+1. **Assembly spec:** direction, gap, padding, child order from assembly chunk
+2. **Child integration:** do the locked children compose correctly? Spacing between them?
+
+**Child unlock (edge case):**
+If the assembly Verifier finds a locked child is wrong in context (e.g., overflows
+when placed next to siblings), the Gatekeeper can unlock the child and re-launch
+its trio with additional context.
+
+#### Step 4: Full Screen Assembly (page-level B→V→G trio)
+
+The final trio assembles all sections into the full screen.
+
+**Builder:** Composes all locked sections into the screen scaffold.
+
+**Verifier** at this level does the comprehensive page-level audit:
+- Assembly gap audit (every gap matches assembly spec exactly)
+- Section order matches child chunk order
+- No missing structural elements (dividers, tab bars, decorative layers)
+- Fixed elements (header, nav) are actually fixed, not scrolling
+- Z-index/layering correct across sections
+- Scroll behavior correct (main vertical + nested horizontal)
+- Full-screen screenshot comparison against `screenshots/full-screen.png`
+
+**Gatekeeper:** Same PASS/FAIL criteria but at page level.
+
+#### Step 5: Build Summary (user checkpoint)
+
+Present complete build results with evidence:
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║ BUILD COMPLETE — [Screen Name]                               ║
+╠══════════════════════════════════════════════════════════════╣
+║ Components: 20/20 ✅  │ Total iterations: 34                 ║
+║ Critical self-caught: 20 │ Escalated to user: 1              ║
+║ Avg iterations: 1.7 per component                            ║
+║                                                              ║
+║ Top issue categories:                                        ║
+║   wrong icon/asset:     5 (25%)                              ║
+║   sizing mode mismatch: 4 (20%)                              ║
+║   wrong stroke/border:  3 (15%)                              ║
+║   position/spacing:     3 (15%)                              ║
+║                                                              ║
+║ Ready for Phase 5 (Production Hardening)?                    ║
+╚══════════════════════════════════════════════════════════════╝
+```
+
+
 ---
 
 ## Phase 4 — Rules & Guardrails
