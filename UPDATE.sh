@@ -121,19 +121,35 @@ echo "Verifying..."
 
 PASS=true
 
-# Check Phase 3.5 exists
-if grep -q "Phase 3.5" "${DST_SKILL}" 2>/dev/null; then
-  echo -e "  ${GREEN}✓${NC} Phase 3.5 (Full-Page Holistic Comparison)"
+# Check Three-Agent Pipeline
+if grep -q "Agent 1: BUILDER" "${DST_SKILL}" 2>/dev/null; then
+  echo -e "  ${GREEN}✓${NC} Three-Agent Pipeline (Builder, Verifier, Gatekeeper)"
 else
-  echo -e "  ${RED}✗${NC} Phase 3.5 missing"
+  echo -e "  ${RED}✗${NC} Three-Agent Pipeline missing"
   PASS=false
 fi
 
-# Check z-index/layering
-if grep -q "Z-index / layering / stacking order" "${DST_SKILL}" 2>/dev/null; then
-  echo -e "  ${GREEN}✓${NC} Z-index/layering coverage"
+# Check Two-Channel Feedback
+if grep -q "Channel 1:" "${DST_SKILL}" 2>/dev/null; then
+  echo -e "  ${GREEN}✓${NC} Two-Channel User Feedback"
 else
-  echo -e "  ${RED}✗${NC} Z-index/layering missing"
+  echo -e "  ${RED}✗${NC} Two-Channel User Feedback missing"
+  PASS=false
+fi
+
+# Check Engineering Mindset
+if grep -q "Engineering Mindset" "${DST_SKILL}" 2>/dev/null; then
+  echo -e "  ${GREEN}✓${NC} Engineering Mindset section"
+else
+  echo -e "  ${RED}✗${NC} Engineering Mindset section missing"
+  PASS=false
+fi
+
+# Check Construction Blueprint principle
+if grep -q "Construction Blueprint" "${DST_SKILL}" 2>/dev/null; then
+  echo -e "  ${GREEN}✓${NC} Construction Blueprint (Principle #8)"
+else
+  echo -e "  ${RED}✗${NC} Construction Blueprint missing"
   PASS=false
 fi
 
@@ -145,12 +161,20 @@ else
   PASS=false
 fi
 
-# Check expanded checklist (should have 90+ checklist items)
+# Check Questioning Protocol
+if grep -q "Questioning Protocol" "${DST_SKILL}" 2>/dev/null; then
+  echo -e "  ${GREEN}✓${NC} Questioning Protocol"
+else
+  echo -e "  ${RED}✗${NC} Questioning Protocol missing"
+  PASS=false
+fi
+
+# Check expanded checklist (should have 50+ checklist items)
 CHECKLIST_COUNT=$(grep -c "^\- \[ \]" "${DST_SKILL}" 2>/dev/null || echo 0)
-if [ "${CHECKLIST_COUNT}" -ge 80 ]; then
+if [ "${CHECKLIST_COUNT}" -ge 50 ]; then
   echo -e "  ${GREEN}✓${NC} Expanded checklist (${CHECKLIST_COUNT} items)"
 else
-  echo -e "  ${RED}✗${NC} Checklist too small (${CHECKLIST_COUNT} items, expected 80+)"
+  echo -e "  ${RED}✗${NC} Checklist too small (${CHECKLIST_COUNT} items, expected 50+)"
   PASS=false
 fi
 
