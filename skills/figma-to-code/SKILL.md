@@ -532,7 +532,7 @@ Example:
 This informs Phase 5c (State & Data Layer Pass) — every DYNAMIC value becomes
 a constructor parameter on the widget, backed by a data model.
 
-### Step 4: Flag Ambiguity — ASK, Don't Guess
+### Step 5: Flag Ambiguity — ASK, Don't Guess
 
 If ANY of the following is unclear, STOP and ask the user:
 - "Is this a tab bar or a button group?"
