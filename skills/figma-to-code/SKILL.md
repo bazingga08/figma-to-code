@@ -545,532 +545,146 @@ If ANY of the following is unclear, STOP and ask the user:
 
 ---
 
-## Phase 3 — Build-Verify-Iterate (Per Component)
+## Phase 3 — Three-Agent Build Pipeline
 
-**BUILD BOTTOM-UP. Smallest leaves first, assemble upward, verify at every level.**
-
-```
-BUILDING ORDER (bottom-up — opposite of reading):
-
-BUILD: Leaf widgets first (smallest, most atomic)
-  └─ Verify each leaf against its chunk screenshot
-THEN: Assemble leaves into parent frames
-  └─ Verify parent against its chunk screenshot
-THEN: Assemble parents into sections
-  └─ Verify section against its section screenshot
-THEN: Assemble sections into full screen
-  └─ Verify full screen against full-screen screenshot
-```
-
-The key insight: **you READ top-down to get context, you BUILD bottom-up for
-precision.** By the time you're assembling parents, the children are already
-verified — errors don't compound upward.
-
-### The 10K Token Rule
-
-Each component you build must be **≤ 9.5K-10K tokens** of complexity.
-This ensures you can hold the FULL spec + screenshot + code in context
-simultaneously, with nothing dropped or approximated.
-
-If a chunk feels too large:
-1. Read its children list in the chunk spec
-2. Build each child as a separate widget first
-3. Verify each child individually
-4. Then assemble the parent using the already-verified children
-
-Example — a "Start Trading" section is too complex as one unit:
-```
-Start Trading (too big — ~25K tokens)
-├─ CoinTabs widget (build first, ~5K tokens) ✅ verified
-├─ ChartArea widget (build next, ~8K tokens) ✅ verified
-├─ PriceInfo widget (build next, ~3K tokens) ✅ verified
-└─ TradeButtons widget (build next, ~3K tokens) ✅ verified
-→ Now assemble StartTradingSection from verified children (~4K tokens)
-→ Verify assembled section against screenshot
-```
-
-### Step 1: Build Reusable Components First
-
-For each entry in `reusables/`:
-1. Read the reusable spec file — these are small, usually ≤ 5K tokens
-2. Check codebase for an existing component that matches
-3. If no match exists, build it following the framework reference file
-4. **Verify** (see Step 4 below)
-
-Reusables are built first because they're referenced by multiple chunks.
-Building them first means they're verified and ready when parent chunks need them.
-
-### Step 2: Build Each Leaf Chunk (numbered order)
-
-For each leaf chunk in `chunks/` (the extractor numbers them in build order):
-
-**2a — Read BOTH the spec AND the screenshot**
-1. Read the chunk `.md` file — exact layout, typography, colors, children
-2. Read the chunk screenshot — understand WHAT this component IS visually
-3. Recall the semantic UI pattern from Phase 2.5 (you already know what this IS)
-4. Recall the parent context from Phase 2 (you already know where this fits)
-
-**2b — Check every style property** (non-negotiable)
-Before writing code, mentally go through EVERY property in the spec:
-
-**Layout & Sizing:**
-- [ ] Layout direction: HORIZONTAL (Row) or VERTICAL (Column) or NONE (Stack)
-- [ ] Width: FIXED (exact px) / FILL (Expanded, stretch to parent) / HUG (shrink-wrap)
-- [ ] Height: FIXED / FILL / HUG — same rules
-- [ ] Padding: all 4 sides exactly (top, right, bottom, left)
-- [ ] Gap: item spacing (can be NEGATIVE for overlapping items — use Transform.translate)
-- [ ] Alignment: main axis AND cross axis independently (SPACE_BETWEEN ≠ CENTER)
-- [ ] Wrap: NO_WRAP (single line) vs WRAP (Wrap widget, items flow to next line)
-- [ ] Grow/flex factor: `grow:1` = Expanded/Flexible in Flutter, `flex:1` in CSS
-- [ ] Min/max width & height constraints (ConstrainedBox / min-width, max-width)
-- [ ] Overflow: HORIZONTAL_SCROLLING / VERTICAL_SCROLLING / clip / visible
-- [ ] Clips content: clip:true = clipBehavior: Clip.hardEdge (hides overflow)
-
-**Positioning & Layering:**
-- [ ] **Z-index / layering / stacking order** (see detailed guide below)
-- [ ] Absolute positioning: pos:ABSOLUTE = Stack + Positioned, NOT in flex flow
-- [ ] Absolute coordinates: exact x, y from spec for positioned elements
-- [ ] Constraints: h=LEFT/RIGHT/CENTER/SCALE/STRETCH, v=TOP/BOTTOM/CENTER/SCALE/STRETCH
-- [ ] isFixed: elements pinned to viewport, outside scroll container
-- [ ] isMask/maskType: alpha/vector masks clip children to shape (ClipPath/ShaderMask)
-
-**Visual Surface:**
-- [ ] Fills: solid (with fill-level opacity), linear/radial/angular/diamond gradients
-      (angle, stops, type ALL matter — angular/diamond need special handling)
-- [ ] Fill vs node opacity: fill opacity affects only that fill; node opacity affects ALL children
-- [ ] Border: per-side weights (top/right/bottom/left can differ), color, strokeAlign
-      (INSIDE/CENTER/OUTSIDE — affects layout dimensions)
-- [ ] Border radius: all 4 corners independently (topLeft ≠ topRight is valid)
-- [ ] Corner smoothing: squircle vs circular arc (SmoothBorderRadius in Flutter)
-- [ ] Stroke cap (BUTT/ROUND/SQUARE) and join (BEVEL/MITER/ROUND) for path strokes
-- [ ] Stroke dash pattern: [dashLength, gapLength] for dashed/dotted lines
-- [ ] Effects: drop shadow vs inner shadow (inset) — different visual meaning
-      Each shadow has: x-offset, y-offset, blur, spread, color (all 5 matter)
-- [ ] Blur effects: layer blur (blurs element) vs backdrop blur (blurs what's behind)
-- [ ] Blend mode: PASS_THROUGH/MULTIPLY/SCREEN/OVERLAY (affects layer compositing)
-- [ ] Rotation: exact degrees, affects layout flow and child rendering
-- [ ] Image fills: scale mode (FILL/FIT/CROP/TILE), rotation, filters (brightness/saturation)
-
-**Typography (every text node):**
-- [ ] Font family, weight, size, italic
-- [ ] Line height (as px value — convert to multiplier: lineHeightPx / fontSize)
-- [ ] Letter spacing (can be negative for tight headers)
-- [ ] Paragraph spacing (space between paragraphs, different from line height)
-- [ ] Color (check spec, not assumption — grays are often subtly different)
-- [ ] Text case transform: UPPER/LOWER/TITLE (use textTransform, not hardcoded text)
-- [ ] Text decoration: underline, strikethrough, overline
-- [ ] Horizontal alignment: LEFT/CENTER/RIGHT/JUSTIFY
-- [ ] Vertical alignment: TOP/CENTER/BOTTOM within text frame
-- [ ] Auto-resize: WIDTH_AND_HEIGHT (hug both) / HEIGHT (fixed width, grow height) /
-      NONE (fixed both) — determines if text wraps, truncates, or overflows
-- [ ] Truncation: maxLines + overflow: ellipsis (only if autoResize ≠ WIDTH_AND_HEIGHT)
-- [ ] Mixed text styles (characterStyleOverrides): bold/colored/different-font spans
-      within one text node — requires RichText/Text.rich, not single Text widget
-
-**Z-Index / Layering / Stacking Order — critical for correct rendering:**
-
-Figma layers elements top-to-bottom in the panel (last child renders on top).
-Many designs rely on precise stacking:
-
-- **`pos: ABSOLUTE` children**: these are positioned OVER their siblings. In the
-  spec, look for `pos:ABSOLUTE` — these MUST use `Stack` + `Positioned` (Flutter),
-  `position: absolute` (React), or equivalent. They are NOT part of the auto-layout
-  flow. Common examples: status badges on cards, glow ellipses behind content,
-  gradient overlay rectangles, floating price indicators, blur rectangles.
-- **Child order = paint order**: in a `Stack`, the FIRST child in the spec is the
-  bottom layer, the LAST child is the top layer. Match this order exactly.
-- **Clip behavior**: `clip: true` on a parent means children that overflow are
-  clipped. Without it, absolute children can bleed outside the parent bounds.
-  Use `clipBehavior: Clip.hardEdge` (Flutter) or `overflow: hidden` (CSS).
-- **Elevation / shadows**: shadows in the spec imply visual depth. Elements with
-  shadows should appear to float above elements without shadows.
-- **Blur effects behind content**: `effects: [blur(Xpx)]` on a rectangle means
-  it's a backdrop blur or glow. These are often absolute-positioned with low
-  opacity, creating depth behind the main content.
-- **`isFixed` / fixed position**: elements marked `isFixed: true` or with
-  `constraints: v=BOTTOM` on the root frame should be fixed (not scroll).
-  Use `Positioned` within the scaffold, not inside `SingleChildScrollView`.
-
-**Common layering patterns in Figma designs:**
-```
-Card with status badge:
-  Stack [
-    Card content (fills parent)          ← bottom layer
-    Status badge (pos:ABSOLUTE, top:12)  ← floats on top
-  ]
-
-Section with glow:
-  Stack [
-    Glow ellipse (pos:ABSOLUTE, opacity:0.3, blur:31px)  ← behind
-    Content column                                         ← on top
-  ]
-
-Gradient overlay:
-  Stack [
-    Background rectangle (pos:ABSOLUTE, gradient fill)    ← behind
-    Foreground content                                    ← on top
-  ]
-```
-
-**If ANY style property exists in the spec, it MUST be in the code.**
-Missing a single `letterSpacing: 0.2` or `borderRadius: 8` makes it not match.
-
-**2c — Build the component**
-- Use exact values from spec — no rounding, no approximation
-- Use actual SVG icons from `.figma-extract/assets/` — never Material Icons
-- Map colors to project tokens — if no match, use the exact hex
-- Follow the semantic pattern identified in Phase 2.5
-- **Respect stacking order** — use Stack for absolute children, maintain paint order
-
-### Step 3: Assemble Parents
-
-For each assembly chunk:
-1. Read assembly spec — direction, gap, padding, alignment, background
-2. Compose already-built children in order
-3. **Verify against parent screenshot** (Step 4)
-
-### Step 4: Visual Verification (per component)
-
-After building each component:
-
-**4a — Capture the built component screenshot**
-
-For Flutter, write a golden test that renders the widget in isolation:
-```dart
-testWidgets('WidgetName matches design', (tester) async {
-  await tester.pumpWidget(MaterialApp(
-    home: Scaffold(body: RepaintBoundary(child: WidgetName())),
-  ));
-  await expectLater(
-    find.byType(WidgetName),
-    matchesGoldenFile('goldens/widget_name.png'),
-  );
-});
-```
-Run: `flutter test --update-goldens test/goldens/widget_name_test.dart`
-
-**4b — Compare using Claude Vision (primary comparator)**
-
-Read BOTH images simultaneously:
-1. Figma reference: `.figma-extract/screenshots/<chunk>.png` (pre-downloaded, consistent)
-2. Built component: `test/goldens/widget_name.png` (captured from golden test)
-
-**Why Claude Vision over pixel-diff tools:**
-- Flutter and Figma use different renderers (Skia vs Figma engine). Font rasterization,
-  anti-aliasing, and sub-pixel rendering ALWAYS differ. A pixel-perfect component will
-  still show 3-5% pixel diff from rendering noise alone.
-- Claude Vision understands semantic similarity: "same text, slightly different font hinting"
-  is a MATCH, not a mismatch. Pixel-diff would flag it as 5% different.
-- Claude Vision gives ACTIONABLE feedback: "padding-left is ~4px too wide" instead of
-  just "5.2% pixels differ."
-
-**Why pre-downloaded screenshots (not MCP `get_screenshot`):**
-- Already on disk from extraction — instant access, no API calls
-- Consistent rendering — same Figma server-side render for all chunks
-- Batch-fetched (50 at a time) — fast and reliable
-- If design was updated since extraction → re-run extractor, don't use stale screenshots
-
-Compare visually, checking:
-- Layout/spacing — padding, gap, alignment, width/height proportions
-- Colors — background, text, borders, shadows
-- Typography — font, weight, size, line height, letter spacing
-- Elements — missing, extra, wrong order
-- Shape — border radius, corners, shadows, opacity
-- Semantic correctness — IS it the right component type?
-
-**4c — Generate structured diff**
-
-For every visual property, explicitly state MATCH or MISMATCH:
+**Every component goes through three independent agents in a loop.
+Verification is impossible to skip — it's a separate agent.**
 
 ```
-MATCH:    layout direction (horizontal) ✓
-MATCH:    background color (#1B1E2D) ✓
-MATCH:    font family (Manrope) ✓
-MATCH:    font size (12px) ✓
-MISMATCH: padding-left should be 12px, appears ~16px → fix to 12
-MISMATCH: border-radius should be 8px, currently 0 → add borderRadius: 8
-MISMATCH: text color should be #A0AEC0, currently #FFFFFF → fix color
-MISSING:  letterSpacing: 0.2px not applied → add letterSpacing
-MISSING:  shadow (0,2,8,0 #00000014) not applied → add BoxShadow
-IGNORED:  font hinting difference (rendering noise, not a real mismatch)
+BUILDER ──→ VERIFIER ──→ GATEKEEPER
+   ↑                         │
+   └──── FAIL (fix list) ────┘
+         PASS → locked ✅
+
+Max 5 iterations. After 5: escalate to user.
 ```
 
-**Important:** Font rendering differences between Flutter and Figma are EXPECTED
-and should be marked IGNORED, not MISMATCH. Only flag actual style mismatches.
+### Agent 1: BUILDER
 
-**4d — Fix and re-verify**
+**Role:** Senior frontend engineer. Reads spec + screenshot, writes component code.
 
-Apply specific fixes from the diff. Re-capture screenshot. Re-compare.
+**Input:**
+- Chunk spec file (.md) — exact properties
+- Chunk screenshot (.png) — visual reference
+- Extracted assets list — available SVGs and PNGs
+- Framework reference file (flutter.md / react.md / react-native.md)
+- Project conventions (from Phase 0)
+- Feedback from Gatekeeper (iteration 2+) — specific fixes to apply
 
-**Keep iterating until 90-95% pixel-to-pixel match (up to 5 iterations).**
+**Process:**
+1. **Pre-build asset check:** For every icon/image in the spec, verify a matching
+   unique asset exists. If missing, flag as `// TODO: icon [name] not exported`.
+   If 3+ icons missing, STOP and report to orchestrator for user escalation.
+2. **Read spec FIRST — build the construction blueprint:**
+   Extract EVERY property from the chunk spec into a structured list BEFORE
+   writing any code. This list becomes the construction plan.
+   ```
+   CONSTRUCTION BLUEPRINT for [ComponentName]:
+   - direction: HORIZONTAL → Row
+   - w: FILL → Expanded
+   - h: HUG → no constraint
+   - padding: 0/12/0/12 → EdgeInsets.symmetric(horizontal: 12)
+   - gap: 4 → SizedBox(width: 4) between children
+   - stroke 1: #4a5568 visible:true → Border.all(Color(0xFF4A5568))
+   - stroke 2: #000000 visible:false → DO NOT RENDER
+   - radius: 8 → BorderRadius.circular(8)
+   - bg fill: NONE → no color property
+   - icon: "Telegram Streamline" → assets/icons/[check if exists]
+   - text: Manrope 700 12px #FFFFFF ls:0.36 → exact style
+   ```
+3. **Read screenshot SECOND:** Use the Read tool on the actual .png file.
+   Cross-check: does my blueprint cover what I see in the screenshot?
+4. **Write code:** From the construction blueprint. Every line of code maps to
+   a blueprint row. Exact numbers, not approximations.
+5. **On iteration 2+:** Read Gatekeeper's fix list. Apply ONLY those fixes.
 
-Each iteration should fix specific mismatches from the structured diff:
-- Iteration 1: layout + spacing corrections
-- Iteration 2: typography + color corrections
-- Iteration 3: border radius + shadow + opacity corrections
-- Iteration 4: fine-tuning alignment, sub-pixel adjustments
-- Iteration 5: final polish
+**Behavior when unclear:**
+- Spec contradicts screenshot → report to orchestrator, wait for user answer
+- Spec is ambiguous → report to orchestrator, wait for user answer
+- Asset missing → flag as TODO, report to orchestrator
 
-If the formatted spec doesn't explain a mismatch, check `raw/*.json` for
-the corresponding chunk — the raw JSON has every Figma property, nothing dropped.
+**NEVER does:**
+- Approximate values from screenshot when spec has exact numbers
+- Use Material Icons or generic icons when specific ones are referenced
+- Skip a property because "it probably doesn't matter"
+- Assume what a component looks like without reading both spec AND screenshot
 
-If still below 90% after 5 iterations:
-- Flag the specific remaining mismatches to the user
-- Show both screenshots (Figma vs built)
-- Ask: "These differences remain. Should I continue, or should we adjust the approach?"
+### Agent 2: VERIFIER
 
-**4e — Lock the component**
+**Role:** QA engineer with fresh eyes. Has ZERO knowledge of how the code was built.
+Only sees: spec, screenshot, and code. Finds every mismatch.
 
-Only lock when the component reaches **90-95% visual match** against the Figma
-screenshot. Keep iterating until it does (up to 5 times).
+**Input:**
+- Chunk spec file (.md)
+- Chunk screenshot (.png)
+- Built component code file
+- Raw JSON file (fallback for properties not in formatted spec)
 
+**Process — Two Layers (both mandatory):**
+
+**Layer 1: Spec-Code Property Table**
+For EVERY property in the chunk spec, produce a verification row:
 ```
-✅ PnlSection — verified (1 iteration, 95% match)
-✅ QuickActions — verified (3 iterations, fixed padding + icon size + gap, 93% match)
-⚠️ CandlestickChart — 88% match after 5 iterations (chart rendering differs from Figma rasterization)
-⏳ WatchlistTabs — building...
-```
-
-### Step 5: Final Screen Assembly & Verification
-
-1. Compose all sections into the full screen
-2. Capture full-screen screenshot
-3. Compare against `screenshots/full-screen.png`
-4. Check: does the FLOW between sections match? Spacing between sections? Dividers?
-5. Report final status with any remaining mismatches
-
----
-
-## Phase 3.5 — Full-Page Holistic Comparison & Iteration (non-negotiable)
-
-**After ALL per-component builds are done, BEFORE moving to production hardening,
-do a full-page holistic visual comparison and fix EVERY visual deviation — whether
-it's spacing, component-level rendering, missing elements, wrong colors, incorrect
-shapes, bad icon usage, or anything else that doesn't match the Figma design.**
-
-This is NOT just a spacing check. This is a comprehensive visual audit of the
-entire built page against the Figma screenshot.
-
-### Why This Phase Exists
-
-Per-component verification catches ~70% of issues. The remaining ~30% only
-become visible when the full page is assembled:
-
-- **Inter-section spacing**: gaps between sections drift from spec
-- **Missing structural elements**: tab bars, dividers, decorative layers,
-  gradient overlays, glow effects that aren't "components" but are in the tree
-- **Component rendering at page context**: a component verified in isolation
-  may look different when surrounded by its actual siblings (colors blend wrong,
-  borders overlap, text clips differently)
-- **Icon/asset mismatches**: Material Icons used where SVGs were needed, wrong
-  icon colors, missing coin logos, placeholder images not replaced
-- **Typography drift**: text styles that were close enough per-component but
-  visibly wrong when seen next to correct text on the same page
-- **Shape/decoration errors**: missing border radius, wrong gradient angles,
-  absent shadows, incorrect opacity, missing custom painted shapes
-- **State/interaction errors**: wrong selected state on tabs, incorrect active
-  indicator placement, missing hover/press states
-- **Scroll/flow issues**: sections that looked fine in isolation don't flow
-  correctly when composed — content overlaps fixed elements, wrong scroll axis
-
-### Step 1: Read the Assembly Specs
-
-Read the **root assembly chunk** (usually the last numbered chunk):
-- **Direction**: VERTICAL for most screens
-- **Gap**: gap between direct children = section-to-section spacing
-- **Padding**: outer padding of the whole page
-- **Child Chunks**: the exact order sections should appear
-
-Also read **parent assembly chunks** (intermediate containers) — their `gap`
-values define inter-section spacing within groups.
-
-**Common miss**: assembly says `gap: 24px` but code uses mixed values
-(12px, 16px, 24px). Standardize to match.
-
-### Step 2: Full-Screen Visual Comparison (COMPREHENSIVE)
-
-Read `screenshots/full-screen.png` alongside the individual section screenshots.
-Go through the page **top to bottom**, examining EVERY visual aspect.
-
-**For EACH component within each section, re-read both the chunk screenshot and
-the built output, checking ALL of the following:**
-
-```
-STRUCTURAL CHECKS (page-level):
-□ Section count matches — no missing or extra sections
-□ Section order matches the assembly child chunk order
-□ Gap between every section pair matches assembly spec exactly
-□ No missing structural elements (tab bars, dividers, separators, overlays)
-□ Fixed elements (header, bottom nav) are fixed, not scrolling
-□ Overall page background color correct
-□ Scroll content doesn't overflow under fixed elements
-
-COMPONENT-LEVEL CHECKS (per section, re-examine against Figma screenshot):
-□ Background colors/gradients match exactly (type: linear/radial/angular, angle, stops)
-□ Fill opacity vs node opacity — correct level applied
-□ Border radius on all containers matches spec (all 4 corners independently)
-□ Per-side border weights correct (top/right/bottom/left can differ)
-□ Stroke align correct (INSIDE/CENTER/OUTSIDE affects box dimensions)
-□ Shadows present: drop shadow AND/OR inner shadow, with correct type
-□ Shadow properties: x-offset, y-offset, blur, spread, color (all 5)
-□ Blur effects: layer blur vs backdrop blur, correct radius
-□ Blend modes applied where non-default (MULTIPLY/SCREEN/OVERLAY)
-□ Opacity values correct (0.3 glow, 0.5 grid lines, etc.)
-□ Masks applied: circle crop, custom shape clip (ClipPath/ClipOval)
-□ Corner smoothing (squircle) where specified
-□ Dashed/dotted borders with correct dash pattern
-□ Rotation angle correct on rotated elements
-
-SIZING & FLEX CHECKS:
-□ Width/height sizing modes correct (FIXED/FILL/HUG per component)
-□ Grow/flex factor applied where spec says grow:1 (Expanded in Flutter)
-□ Min/max size constraints applied
-□ Negative gap handled (overlapping items via Transform or Stack)
-□ Wrap behavior correct (single-line scroll vs multi-line wrap)
-□ Layout direction correct per container (Row vs Column vs Stack)
-
-ICON & ASSET CHECKS:
-□ Every icon uses extracted SVG from assets/, NOT Material Icons or placeholders
-□ Coin logos correct per-coin (BTC = bitcoin SVG, others = their specific logo)
-□ Image fills use actual exported PNGs, not colored rectangles
-□ Image scale mode correct (FILL/FIT/CROP — BoxFit.cover vs contain vs fill)
-□ Image filters applied if specified (brightness, saturation)
-□ Icon colors match spec (not default white when spec says #718096, etc.)
-□ Icon sizes match spec exactly
-
-TYPOGRAPHY CHECKS (scan full page for visible text mismatches):
-□ Font family correct (Manrope vs Roboto vs Rubik)
-□ Font weights visually distinguishable where spec differs (500 vs 600 vs 700)
-□ Text colors match — especially grays (#A0AEC0 vs #718096 vs #4A5568)
-□ Letter spacing applied where specified (0.36px, 0.42px, including negative)
-□ Line height matches (px value / fontSize = multiplier)
-□ Text case transforms applied (UPPER/LOWER via textTransform, not hardcoded)
-□ Text decoration correct (underline, strikethrough where specified)
-□ Vertical text alignment matches (TOP/CENTER/BOTTOM within frame)
-□ Auto-resize mode correct (hug vs fixed-width-grow-height vs fixed-both)
-□ Text truncation/maxLines applied on dynamic text
-□ Mixed text styles rendered with RichText (bold words, colored spans)
-
-LAYOUT & SPACING CHECKS:
-□ Horizontal padding matches (usually 16px from screen edge)
-□ Section header alignment (left text, right action links)
-□ Internal component gaps match per-component spec
-□ Scroll direction correct (horizontal for card lists, vertical for main)
-□ Selected/active state indicators positioned correctly
-□ Tab underlines, pills, badges in correct position
-
-SHAPE & DECORATION CHECKS:
-□ Custom shapes rendered (angled nav selectors, pill badges, gradient borders)
-□ Gradient borders present where spec shows them (e.g., gold gradient border)
-□ Divider lines present with correct color and position
-□ Card border styles correct (solid vs gradient vs none)
-
-Z-INDEX / LAYERING / STACKING CHECKS:
-□ Absolute-positioned elements render ON TOP of their siblings (badges, overlays)
-□ Glow/blur ellipses render BEHIND content, not on top or missing
-□ Status badges on cards overlap the card edge correctly (not clipped or misplaced)
-□ Gradient overlay rectangles behind content sections are present and layered correctly
-□ Stack child order matches Figma layer order (first child = bottom, last = top)
-□ Clip behavior correct — overflow hidden where spec says clip:true
-□ Fixed elements (header, bottom nav) layer above scrollable content
-□ Floating indicators (price badges, dot markers) positioned over their context
-□ Cards with both absolute children AND auto-layout children render correctly
-□ Opacity on background layers doesn't bleed through incorrectly
+SPEC-CODE VERIFICATION TABLE for [ComponentName]:
+| # | Spec Property     | Spec Value              | Code Implementation          | Match |
+|---|-------------------|-------------------------|-------------------------------|-------|
+| 1 | layout direction  | HORIZONTAL              | Row()                         | ✓     |
+| 2 | w sizing          | FILL                    | Expanded wrapping Row         | ✓     |
+| 3 | stroke 1          | #4a5568 vis:true        | Border.all(#4a5568)           | ✓     |
+| 4 | stroke 2          | #000000 vis:false       | not rendered                  | ✓     |
+| 5 | icon ref          | "Telegram Streamline"   | assets/icons/telegram.svg     | ✓     |
+| 6 | bg fill           | none                    | Container has color: green    | ✗ !!! |
 ```
 
-### Step 3: Build the Comprehensive Diff
+Rules:
+- List EVERY property — not just ones that look important
+- For strokes: list EACH stroke with its `visible` flag separately
+- For sizing: explicitly write FILL/HUG/FIXED and the code equivalent
+- For icons: write the exact asset path — "icon.svg" for 6 different icons = ✗
+- For absolute positions: write exact x,y coordinates
 
-Create a section-by-section diff covering ALL issue types. Be specific:
+**Layer 2: Visual Screenshot Comparison**
+Read the Figma chunk screenshot using the Read tool and describe element by element.
+For each element: does the code produce the same element?
 
+Produce a structured visual diff:
 ```
-SECTION: Header (mWeb_Header)
-MATCH:    height 40px, bg #000000 ✓
-MATCH:    chevron-left.svg at 24x24 ✓
-MATCH:    CS PRO logo mini ✓
-COMPONENT: hamburger icon — using Icons.menu, should use extracted SVG → fix
-COMPONENT: wallet icon size should be 16x16 → verify
-
-GAP: Header → P&L = 0px (flush) ✓
-
-SECTION: P&L (Frame 2147225832)
-MATCH:    gradient 180deg #12131900 → #1B1E2D ✓
-MATCH:    amount text Manrope 700 24px #26D08D ✓
-SPACING:  outer padding should be 0, was 20px horizontal → fix
-COMPONENT: percentage badge radius should be 16px → verify
-
-GAP: P&L → Explore Tab = 0px ✓
-MISSING:  Explore/Strategies tab bar (Frame 2147225831) not built → ADD
-          — has angled edge shape, "Explore" selected, "Strategies" with "3 New" badge
-
-GAP: Explore Tab → Quick Actions = per spec
-SECTION: Quick Actions (Frame 2147225699)
-MATCH:    horizontal scroll, 8px gap ✓
-COMPONENT: first chip "Telegram Connect" should have gradient border
-           (linear-gradient 13deg #7b653233 → #7B6532 → #7b65324d) → fix
-ICON:     all chips use generic icon.svg, should use per-action icons
-          (Telegram vector, scalper lines, Smart Invest diamond, etc.) → flag TODO
-
-...continue for EVERY section...
-
-SECTION: Bottom Nav (Nav Items)
-COMPONENT: "Futures" selector missing angled polygon background shape → fix
-ICON:     nav icons using Material Icons, should use custom vectors → fix if SVGs available
-COMPONENT: gold tab indicator position under "Home" → verify alignment
+VISUAL DIFF for [ComponentName]:
+MATCH:    horizontal layout with 3 items ✓
+MISMATCH: icon should be blue telegram arrow, code uses gray chevron → CRITICAL
+MATCH:    text "Telegram\nConnect" Manrope 600 10px ✓
+IGNORED:  font hinting difference (renderer noise) → MINOR
 ```
 
-### Step 4: Fix ALL Mismatches
+**Severity classification:**
+- **CRITICAL:** Wrong sizing mode, missing/wrong fill or stroke, wrong icon,
+  missing element, wrong color, wrong absolute position, missing border
+- **MINOR:** 1-2px spacing from renderer difference, font hinting, sub-pixel alignment
 
-Fix in this priority order — **all types, not just spacing**:
+**Output:** Verification report with:
+- Spec-code property table (all rows with ✓ or ✗)
+- Visual diff (MATCH/MISMATCH/IGNORED for each element)
+- Summary: X critical, Y minor mismatches
 
-1. **Missing elements** — add structural components that exist in Figma but
-   are absent: tab bars, dividers, decorative overlays, gradient layers
-2. **Component rendering** — fix backgrounds, borders, shadows, shapes,
-   gradients, opacity, border-radius on EVERY container that doesn't match
-3. **Icons & assets** — replace any Material Icons or placeholders with
-   actual extracted SVGs. Fix icon colors and sizes
-4. **Typography** — fix font family/weight/size/color/letterSpacing mismatches
-5. **Spacing & layout** — standardize section gaps, fix padding, alignment
-6. **Polish** — selected states, active indicators, glow effects, blur effects
+### Agent 3: GATEKEEPER
 
-**For each fix, re-read the relevant chunk spec to get the EXACT values.**
-Do not guess from the screenshot — the spec is the source of truth.
+**Role:** Engineering manager. Reviews verifier's report. Makes pass/fail decision.
+Does NOT look at the code or spec — only the verifier's report.
 
-### Step 5: Re-verify Full Page (iterate)
+**Input:** Verifier's complete report + current iteration number (1-5)
 
-After applying all fixes:
-1. Re-capture full-screen screenshot (golden test or device screenshot)
-2. Re-compare against `screenshots/full-screen.png`
-3. If new mismatches are visible, go back to Step 3
+**Decision criteria:**
+- **PASS:** Zero CRITICAL mismatches. Any number of MINOR is acceptable.
+- **FAIL (iteration 1-4):** Produce specific fix list for Builder:
+  ```
+  FIX LIST for [ComponentName] (iteration 2):
+  1. Change bg fill from #0BA267 to NONE (remove color property)
+  2. Add stroke: Border.all(color: Color(0xFF4A5568), width: 1)
+  3. Change width from HUG to FILL (Expanded)
+  ```
+- **FAIL (iteration 5):** Escalate to user with full evidence + options:
+  A) Continue iterating  B) Skip  C) Show screenshots  D) Keep trying
 
-**Max 3 full-page iterations.** Each iteration should have FEWER issues.
-If issues remain after 3 iterations:
-- List every remaining mismatch with specific details
-- Show both screenshots (Figma vs built)
-- Ask the user: "These differences remain. Should I keep iterating,
-  or are these acceptable?"
-
-### What This Phase Should Catch (examples from real builds)
-
-These are real issues found only during page-level comparison that
-per-component verification missed:
-
-| Issue type | Example |
-|-----------|---------|
-| Missing element | Explore/Strategies tab bar between P&L and quick actions |
-| Wrong spacing | 12px gap used instead of 24px between Announcements and Start Trading |
-| Component shape | Bottom nav "Futures" selector missing angled polygon cutout |
-| Icon mismatch | Watchlist tab icons missing — only star was rendered, not gainers/losers arrows |
-| Coin logo | ETH/SOL tabs showing placeholder instead of actual coin logo images |
-| Tab styling | Selected coin tab using green fill instead of dark fill with border |
-| Padding drift | P&L section had extra 20px horizontal margin not in spec |
-| Gradient border | First quick action chip missing gold gradient border |
-| Badge missing | "3 New" red badge on Strategies tab not rendered |
-| Decoration | Green glow ellipse behind announcement card positioned wrong |
-| Z-index/layering | Status badge (ATTENDING) should overlap card edge but was clipped by parent |
-| Z-index/layering | Glow ellipse rendered ON TOP of text instead of behind it (wrong Stack order) |
-| Z-index/layering | Gradient overlay rectangle (pos:ABSOLUTE) missing entirely — content has no depth |
-| Z-index/layering | Floating price indicator on chart not positioned over candles (missing Stack) |
-| Z-index/layering | Card clip:true was missing — absolute badge bled outside card bounds |
 
 ---
 
