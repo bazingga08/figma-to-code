@@ -114,6 +114,66 @@ The design shows the happy path at one screen size. Production code handles:
 - Every failure (network down, image 404, slow connection)
 - Every data shape (empty list, single item, very long text)
 
+### 7. Spec-First, Screenshot-Second
+**NEVER build from the screenshot alone.** The screenshot shows what it LOOKS like.
+The spec shows what it IS — exact property values that determine the code.
+
+Build order for every component:
+1. Read the SPEC — extract every property into a construction blueprint
+2. Write the code from blueprint values — exact numbers, not approximations
+3. THEN compare against the screenshot to catch anything the spec missed
+
+### 8. Construction Blueprint (mandatory per component)
+Before writing any code, the Builder extracts EVERY property from the chunk spec
+into a structured blueprint. This blueprint is the construction plan — every line
+of code maps to a row in this list.
+
+```
+CONSTRUCTION BLUEPRINT for [ComponentName]:
+- direction: HORIZONTAL → Row
+- w: FILL → Expanded
+- padding: 0/12/0/12 → EdgeInsets.symmetric(horizontal: 12)
+- stroke 1: #4a5568 visible:true → Border.all(Color(0xFF4A5568))
+- stroke 2: #000000 visible:false → DO NOT RENDER
+- icon: "Telegram Streamline" → assets/icons/[check if exists]
+```
+
+This prevents "I forgot about that property." If it's in the spec, it's in the
+blueprint, and it MUST be in the code.
+
+### 9. Asset Cross-Reference (mandatory before building)
+Before writing ANY component code, verify every icon/image referenced in the spec
+has a matching UNIQUE exported asset. If missing, flag as TODO and report to user.
+NEVER use a generic icon.svg for multiple different icons. NEVER use Material Icons.
+
+## Engineering Mindset — Governs the Entire Pipeline
+
+Every agent operates as the **most meticulous, senior frontend engineer possible**.
+
+**Treats every property with utmost care:**
+- A 1px border difference matters. A wrong sizing mode matters.
+- There is no "close enough." Either the code matches the spec or it doesn't.
+
+**Never cuts corners under speed pressure:**
+- Building 13 components in 3 minutes with zero verification is reckless.
+- The correct speed: build one, verify one, fix, lock, next.
+
+**Reads the actual screenshot every single time:**
+- "I already know what it looks like" is the #1 cause of missed issues.
+- Read the Figma screenshot using the Read tool. Every time. For every component.
+
+**Uses the spec as a construction blueprint, not just an audit checklist:**
+- Before writing code, extract every property into a structured list.
+- Every line of code maps to a row in this list.
+- After writing, the Verifier checks every row against the code.
+
+**Questions everything unclear — loudly, not silently:**
+- "Spec says no fill, screenshot shows green. Which should I follow?"
+- Silent assumptions are the root cause of every issue in past builds.
+
+**Takes pride in pixel-perfect output:**
+- The goal: a designer looks at the output and can't tell it from the Figma.
+
 ## Technical Architecture
 
 Instead of calling Figma MCP tools directly (which truncate at ~10K tokens and
