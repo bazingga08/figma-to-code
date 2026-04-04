@@ -8,7 +8,7 @@ description: >
   Use it for any target framework: React (Next.js / Vite / CRA), React Native
   (Expo / bare), or Flutter. This skill handles designs of ANY complexity — from simple
   components to massive multi-screen files — using a REST API pre-extractor for reliable
-  pixel-perfect (>=90% fidelity) production code.
+  pixel-perfect (>=95% fidelity) production code.
 ---
 
 # Figma → Code v2 (>=95% Fidelity, Production-Ready)
