@@ -28,12 +28,12 @@ It reads every single detail from your Figma design, organizes it into neat chun
 
 ```mermaid
 flowchart LR
-    A["🔗 Figma Link"] --> B["📦 EXTRACT\n(Node.js Script)"]
-    B --> C["📂 .figma-extract/\nspecs + screenshots\n+ assets + tokens"]
-    C --> D["🧠 UNDERSTAND\n(Claude reads everything)"]
-    D --> E["🔨 BUILD + VERIFY\n(one piece at a time)"]
-    E --> F["🛡️ HARDEN\n(responsive, a11y,\nstates, edge cases)"]
-    F --> G["✅ Production\nCode"]
+    A[Figma Link] --> B[EXTRACT<br/>Node.js Script]
+    B --> C[.figma-extract<br/>specs + screenshots<br/>+ assets + tokens]
+    C --> D[UNDERSTAND<br/>Claude reads everything]
+    D --> E[BUILD + VERIFY<br/>one piece at a time]
+    E --> F[HARDEN<br/>responsive, a11y,<br/>states, edge cases]
+    F --> G[Production<br/>Code]
 
     style A fill:#5B4BC9,color:#ffffff,stroke:#3d2d99,stroke-width:2px
     style B fill:#D94452,color:#ffffff,stroke:#b52d3a,stroke-width:2px
@@ -54,14 +54,14 @@ Before writing a single line of code, a Node.js script reads the **ENTIRE** Figm
 
 ```mermaid
 flowchart TD
-    LINK["🔗 Figma Link — paste your URL"] --> API["🌐 Figma REST API\n— fetches FULL design tree in 1 call"]
+    LINK[Figma Link - paste your URL] --> API[Figma REST API<br/>fetches FULL design tree in 1 call]
 
-    API --> S1["1️⃣ FETCH\nComplete node tree\n100K-300K+ tokens"]
-    API --> S2["2️⃣ ANALYZE\nHierarchy, nesting,\nbuild order"]
-    API --> S3["3️⃣ DETECT\nReusable components\nbuild once, reuse many"]
-    API --> S4["4️⃣ EXTRACT\nDesign tokens: colors,\nfonts, spacing, shadows"]
-    API --> S5["5️⃣ EXPORT\nIcons as SVG +\nImages as PNG"]
-    API --> S6["6️⃣ CHUNK\nSplit into ~10K-token\nbuildable pieces"]
+    API --> S1[Step 1 - FETCH<br/>Complete node tree<br/>100K-300K+ tokens]
+    API --> S2[Step 2 - ANALYZE<br/>Hierarchy, nesting,<br/>build order]
+    API --> S3[Step 3 - DETECT<br/>Reusable components<br/>build once, reuse many]
+    API --> S4[Step 4 - EXTRACT<br/>Design tokens: colors,<br/>fonts, spacing, shadows]
+    API --> S5[Step 5 - EXPORT<br/>Icons as SVG +<br/>Images as PNG]
+    API --> S6[Step 6 - CHUNK<br/>Split into 10K-token<br/>buildable pieces]
 
     S1 --> OUT
     S2 --> OUT
@@ -70,14 +70,14 @@ flowchart TD
     S5 --> OUT
     S6 --> OUT
 
-    OUT["📂 .figma-extract/ folder"]
+    OUT[.figma-extract/ folder]
 
-    OUT --> F1["📋 blueprint.md\nMaster plan + build order"]
-    OUT --> F2["📄 chunks/\nPer-component specs"]
-    OUT --> F3["📸 screenshots/\nVisual references"]
-    OUT --> F4["🎨 assets/icons/ + images/\nSVGs + PNGs"]
-    OUT --> F5["♻️ reusables/\nShared components"]
-    OUT --> F6["💾 raw/\nSource-of-truth JSON"]
+    OUT --> F1[blueprint.md<br/>Master plan + build order]
+    OUT --> F2[chunks/<br/>Per-component specs]
+    OUT --> F3[screenshots/<br/>Visual references]
+    OUT --> F4[assets/icons/ + images/<br/>SVGs + PNGs]
+    OUT --> F5[reusables/<br/>Shared components]
+    OUT --> F6[raw/<br/>Source-of-truth JSON]
 
     style LINK fill:#5B4BC9,color:#ffffff,stroke:#3d2d99,stroke-width:2px
     style API fill:#D94452,color:#ffffff,stroke:#b52d3a,stroke-width:2px
@@ -102,21 +102,21 @@ Claude reads the extracted specs and builds production code — not all at once,
 
 ```mermaid
 flowchart TD
-    P0["⚙️ Phase 0: DETECT\nWhat framework? What existing\ncomponents / theme / patterns?"] --> P1
+    P0[Phase 0 - DETECT<br/>What framework? What existing<br/>components / theme / patterns?] --> P1
 
-    P1["📦 Phase 1: EXTRACT\nRun the Node.js extractor\nFull design → .figma-extract/"] --> P2
+    P1[Phase 1 - EXTRACT<br/>Run the Node.js extractor<br/>Full design to .figma-extract/] --> P2
 
-    P2["📖 Phase 2: READ\nRead blueprint top-down\nScreen → Sections → Components\nUnderstand the BIG PICTURE"] --> P25
+    P2[Phase 2 - READ<br/>Read blueprint top-down<br/>Screen, Sections, Components<br/>Understand the BIG PICTURE] --> P25
 
-    P25["🧠 Phase 2.5: UNDERSTAND\nSemantic mapping:\nThis is a tab bar, not buttons\nThis list is scrollable\nThis data is dynamic"] --> P3
+    P25[Phase 2.5 - UNDERSTAND<br/>Semantic mapping:<br/>This is a tab bar, not buttons<br/>This list is scrollable<br/>This data is dynamic] --> P3
 
-    P3["🔨 Phase 3: BUILD + VERIFY\nBottom-up, one piece at a time\nSee verification loop below"] --> P4
+    P3[Phase 3 - BUILD + VERIFY<br/>Bottom-up, one piece at a time<br/>See verification loop below] --> P4
 
-    P4["✅ Phase 4: RULES\n95% fidelity checklist\n~50 items per component\nEvery property verified"] --> P5
+    P4[Phase 4 - RULES<br/>95% fidelity checklist<br/>50 items per component<br/>Every property verified] --> P5
 
-    P5["🛡️ Phase 5: HARDEN\nResponsive + Accessibility\nStates + Data + Navigation\nEdge cases + Performance"] --> P6
+    P5[Phase 5 - HARDEN<br/>Responsive + Accessibility<br/>States + Data + Navigation<br/>Edge cases + Performance] --> P6
 
-    P6["🏁 Phase 6: CHECKPOINT\nShow user everything built\nList deviations + concerns\nGet approval before shipping"]
+    P6[Phase 6 - CHECKPOINT<br/>Show user everything built<br/>List deviations + concerns<br/>Get approval before shipping]
 
     style P0 fill:#2D8E47,color:#ffffff,stroke:#1e6b33,stroke-width:2px
     style P1 fill:#D4851F,color:#ffffff,stroke:#b06b10,stroke-width:2px
@@ -134,30 +134,30 @@ This is what makes the output accurate. Every single component goes through this
 
 ```mermaid
 flowchart TD
-    START["🎯 Pick next component\nsmallest first — bottom-up"] --> READ
+    START[Pick next component<br/>smallest first, bottom-up] --> READ
 
-    READ["1. Read the SPEC\nExtract every property into\na construction blueprint"] --> CODE
+    READ[1. Read the SPEC<br/>Extract every property into<br/>a construction blueprint] --> CODE
 
-    CODE["2. Write the CODE\nEvery line maps to a\nblueprint property"] --> SCREENSHOT
+    CODE[2. Write the CODE<br/>Every line maps to a<br/>blueprint property] --> SCREENSHOT
 
-    SCREENSHOT["3. Take a SCREENSHOT\nof what we just built"] --> COMPARE
+    SCREENSHOT[3. Take a SCREENSHOT<br/>of what we just built] --> COMPARE
 
-    COMPARE["4. COMPARE to Figma\nscreenshot side-by-side"] --> MATCH
+    COMPARE[4. COMPARE to Figma<br/>screenshot side-by-side] --> MATCH
 
-    MATCH{"Does it\nmatch?"}
+    MATCH{Does it<br/>match?}
 
-    MATCH -->|"Yes ✅"| LOCK["🔒 LOCK\nComponent verified.\nMove to next piece."]
+    MATCH -->|Yes| LOCK[LOCKED<br/>Component verified.<br/>Move to next piece.]
 
-    MATCH -->|"No ❌"| DIFF["5. Generate STRUCTURED DIFF\n— Padding off by 4px\n— Wrong border radius\n— Missing shadow"]
+    MATCH -->|No| DIFF[5. Generate STRUCTURED DIFF<br/>Padding off by 4px<br/>Wrong border radius<br/>Missing shadow]
 
-    DIFF --> FIX["6. FIX each mismatch\nusing exact spec values"]
+    DIFF --> FIX[6. FIX each mismatch<br/>using exact spec values]
 
-    FIX --> COUNT{"Tried\n3 times?"}
+    FIX --> COUNT{Tried<br/>3 times?}
 
-    COUNT -->|"No"| SCREENSHOT
-    COUNT -->|"Yes"| ASK["🙋 Ask user:\nThese differences remain.\nKeep going or fix manually?"]
+    COUNT -->|No| SCREENSHOT
+    COUNT -->|Yes| ASK[Ask user:<br/>These differences remain.<br/>Keep going or fix manually?]
 
-    LOCK --> NEXT["➡️ Next component\nor assemble parent"]
+    LOCK --> NEXT[Next component<br/>or assemble parent]
 
     style START fill:#5B4BC9,color:#ffffff,stroke:#3d2d99,stroke-width:2px
     style LOCK fill:#0E8C6E,color:#ffffff,stroke:#066b52,stroke-width:2px
@@ -179,18 +179,18 @@ This is a critical concept — the system reads the design like a book (big pict
 
 ```mermaid
 flowchart TD
-    subgraph READ ["📖 READING — Top-Down"]
+    subgraph READ [READING - Top-Down]
         direction TB
-        R1["🖥️ Full Screen"] --> R2["📑 Sections"]
-        R2 --> R3["🧩 Components"]
-        R3 --> R4["🔘 Leaves — buttons, text, icons"]
+        R1[Full Screen] --> R2[Sections]
+        R2 --> R3[Components]
+        R3 --> R4[Leaves: buttons, text, icons]
     end
 
-    subgraph BUILD ["🔨 BUILDING — Bottom-Up"]
+    subgraph BUILD [BUILDING - Bottom-Up]
         direction BT
-        B4["🔘 Leaves — buttons, text, icons"] --> B3["🧩 Components"]
-        B3 --> B2["📑 Sections"]
-        B2 --> B1["🖥️ Full Screen"]
+        B4[Leaves: buttons, text, icons] --> B3[Components]
+        B3 --> B2[Sections]
+        B2 --> B1[Full Screen]
     end
 
     READ --> BUILD
@@ -217,14 +217,14 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    subgraph OLD ["❌ Other Tools"]
+    subgraph OLD [Other Tools]
         direction TB
-        O1["Read SOME of\nthe design\n— 3-10% —"] --> O2["Build\nEVERYTHING\nat once"] --> O3["Hope it\nmatches\n— it never does —"]
+        O1[Read SOME of<br/>the design<br/>3-10%] --> O2[Build<br/>EVERYTHING<br/>at once] --> O3[Hope it<br/>matches<br/>it never does]
     end
 
-    subgraph NEW ["✅ Figma-to-Code v2"]
+    subgraph NEW [Figma-to-Code v2]
         direction TB
-        N1["Read 100%\nof the design\n— every property —"] --> N2["Build ONE\npiece at a time\n— verify each —"] --> N3["95% match\nguaranteed\n— checked per component —"]
+        N1[Read 100%<br/>of the design<br/>every property] --> N2[Build ONE<br/>piece at a time<br/>verify each] --> N3[95% match<br/>guaranteed<br/>checked per component]
     end
 
     style OLD fill:#D94452,color:#ffffff,stroke:#b52d3a,stroke-width:2px
@@ -277,13 +277,13 @@ Figma shows 1 screen size, with perfect data, in a happy state. Real apps need:
 
 ```mermaid
 flowchart TD
-    FIGMA["🎨 What Figma shows:\n375px wide, perfect data,\nhappy path only"] --> GAP["⚠️ THE GAP\n60% of production code\nisn't visible in Figma"]
+    FIGMA[What Figma shows:<br/>375px wide, perfect data,<br/>happy path only] --> GAP[THE GAP<br/>60% of production code<br/>is not visible in Figma]
 
-    GAP --> H1["📱 Responsive\n320px phone → 768px tablet\nFlexible widths, not hardcoded"]
-    GAP --> H2["♿ Accessibility\n48x48 touch targets\nScreen reader labels\nRTL language support"]
-    GAP --> H3["🔄 States\nLoading spinners\nError messages\nEmpty list placeholders"]
-    GAP --> H4["💾 Data Layer\nData models from design\nRepository interfaces\nAPI stubs"]
-    GAP --> H5["🧪 Edge Cases\nSuper long text → truncation\nEmpty lists → placeholder\nImage 404 → fallback"]
+    GAP --> H1[Responsive<br/>320px phone to 768px tablet<br/>Flexible widths, not hardcoded]
+    GAP --> H2[Accessibility<br/>48x48 touch targets<br/>Screen reader labels<br/>RTL language support]
+    GAP --> H3[States<br/>Loading spinners<br/>Error messages<br/>Empty list placeholders]
+    GAP --> H4[Data Layer<br/>Data models from design<br/>Repository interfaces<br/>API stubs]
+    GAP --> H5[Edge Cases<br/>Super long text, truncation<br/>Empty lists, placeholder<br/>Image 404, fallback]
 
     style FIGMA fill:#5B4BC9,color:#ffffff,stroke:#3d2d99,stroke-width:2px
     style GAP fill:#D94452,color:#ffffff,stroke:#b52d3a,stroke-width:2px
@@ -302,21 +302,21 @@ Every component is checked against this before being marked done:
 
 ```mermaid
 flowchart TD
-    CHECK["✅ 95% Fidelity Check\n— per component —"]
+    CHECK[95% Fidelity Check<br/>per component]
 
-    CHECK --> LAYOUT["📐 Spacing & Layout — 12 items\nDirection, padding all 4 sides, gap,\nsizing modes, alignment, flex/grow,\nwrap, absolute pos, min/max, clip, scroll"]
+    CHECK --> LAYOUT[Spacing and Layout - 12 items<br/>Direction, padding all 4 sides, gap,<br/>sizing modes, alignment, flex/grow,<br/>wrap, absolute pos, min/max, clip, scroll]
 
-    CHECK --> TYPE["🔤 Typography — 15 items\nFont family, weight, size, italic,\nline height, letter spacing, color,\ntext case, decoration, alignment,\nauto-resize, truncation, mixed styles"]
+    CHECK --> TYPE[Typography - 15 items<br/>Font family, weight, size, italic,<br/>line height, letter spacing, color,<br/>text case, decoration, alignment,<br/>auto-resize, truncation, mixed styles]
 
-    CHECK --> COLOR["🎨 Color & Surface — 20+ items\nFills solid + gradients, opacity,\nborder weight/color/align/radius,\ncorner smoothing, stroke cap/join/dash,\ndrop + inner shadow, blur, blend, rotation"]
+    CHECK --> COLOR[Color and Surface - 20+ items<br/>Fills solid + gradients, opacity,<br/>border weight/color/align/radius,<br/>corner smoothing, stroke cap/join/dash,<br/>drop + inner shadow, blur, blend, rotation]
 
-    CHECK --> MASK["✂️ Masks & Clipping\nClip shapes, masked images,\ncustom vector shapes"]
+    CHECK --> MASK[Masks and Clipping<br/>Clip shapes, masked images,<br/>custom vector shapes]
 
-    CHECK --> SEMANTIC["🧠 Semantic Correctness\nComponent type matches intent,\nproper interactive patterns,\nbuilder pattern for lists"]
+    CHECK --> SEMANTIC[Semantic Correctness<br/>Component type matches intent,<br/>proper interactive patterns,<br/>builder pattern for lists]
 
-    CHECK --> ZINDEX["📚 Z-Index & Layering\nStack order, absolute positioning,\nglow/blur behind content,\nfixed headers above scroll"]
+    CHECK --> ZINDEX[Z-Index and Layering<br/>Stack order, absolute positioning,<br/>glow/blur behind content,<br/>fixed headers above scroll]
 
-    CHECK --> ASSETS["🖼️ Assets & Images\nAll icons from extracted SVGs,\nno substitutes, correct scale mode,\nimage filters + rotation"]
+    CHECK --> ASSETS[Assets and Images<br/>All icons from extracted SVGs,<br/>no substitutes, correct scale mode,<br/>image filters + rotation]
 
     style CHECK fill:#D94452,color:#ffffff,stroke:#b52d3a,stroke-width:2px
     style LAYOUT fill:#ffffff,color:#1a1a2e,stroke:#1A73C7,stroke-width:2px
@@ -370,25 +370,25 @@ The official Figma MCP server is great for small components. But on real product
 
 ```mermaid
 flowchart LR
-    DESIGN["🎨 Your Figma Screen\n100K-350K tokens\nof design data"] --> MCP
+    DESIGN[Your Figma Screen<br/>100K-350K tokens<br/>of design data] --> MCP
 
-    subgraph MCP ["❌ Figma MCP Server"]
+    subgraph MCP [Figma MCP Server]
         direction TB
-        M1["get_design_context\n~25K token hard limit"]
-        M1 --> TRUNC["⚠️ TRUNCATION\nSilently drops:\n— Gradient angles\n— Individual corner radii\n— Mixed text styles\n— Deep nested layers\n— Shadow spread values\n— Mask properties\n— Blend modes"]
+        M1[get_design_context<br/>25K token hard limit]
+        M1 --> TRUNC[TRUNCATION<br/>Silently drops:<br/>Gradient angles<br/>Individual corner radii<br/>Mixed text styles<br/>Deep nested layers<br/>Shadow spread values<br/>Mask properties<br/>Blend modes]
     end
 
-    subgraph REST ["✅ This Plugin — REST API"]
+    subgraph REST [This Plugin - REST API]
         direction TB
-        R1["Figma REST API\nNo token limit"]
-        R1 --> FULL["💯 COMPLETE DATA\nEvery property captured:\n— All 50+ style categories\n— Raw JSON preserved\n— Zero silent drops"]
+        R1[Figma REST API<br/>No token limit]
+        R1 --> FULL[COMPLETE DATA<br/>Every property captured:<br/>All 50+ style categories<br/>Raw JSON preserved<br/>Zero silent drops]
     end
 
     DESIGN --> REST
 
-    MCP --> OUT1["❌ 40-60% of your\ndesign data\nbest case: 70-85%\nwith chunked refetches"]
+    MCP --> OUT1[40-60% of your<br/>design data<br/>best case: 70-85%<br/>with chunked refetches]
 
-    REST --> OUT2["✅ 100% of your\ndesign data\nraw JSON backup\nfor edge cases"]
+    REST --> OUT2[100% of your<br/>design data<br/>raw JSON backup<br/>for edge cases]
 
     style DESIGN fill:#5B4BC9,color:#ffffff,stroke:#3d2d99,stroke-width:2px
     style MCP fill:#D94452,color:#ffffff,stroke:#b52d3a,stroke-width:2px
@@ -428,23 +428,23 @@ When MCP truncates (and it always does on real screens), here's what silently di
 
 ```mermaid
 flowchart TD
-    subgraph LOST ["❌ Properties MCP Silently Drops"]
+    subgraph LOST [Properties MCP Silently Drops]
         direction TB
-        L1["Gradient stop details\nangles, exact positions"]
-        L2["Individual corner radii\nsquircle / corner smoothing"]
-        L3["Mixed text styles\nbold word inside normal text"]
-        L4["Deep nested absolute positions\nx,y coordinates lost"]
-        L5["Mask and clip properties"]
-        L6["Blend modes on inner layers"]
-        L7["Shadow spread values\non secondary shadows"]
-        L8["Stroke dash patterns\nand individual widths"]
+        L1[Gradient stop details<br/>angles, exact positions]
+        L2[Individual corner radii<br/>squircle / corner smoothing]
+        L3[Mixed text styles<br/>bold word inside normal text]
+        L4[Deep nested absolute positions<br/>x,y coordinates lost]
+        L5[Mask and clip properties]
+        L6[Blend modes on inner layers]
+        L7[Shadow spread values<br/>on secondary shadows]
+        L8[Stroke dash patterns<br/>and individual widths]
     end
 
-    subgraph KEPT ["✅ What This Plugin Captures"]
+    subgraph KEPT [What This Plugin Captures]
         direction TB
-        K1["ALL of the above +\n50+ property categories"]
-        K2["Raw JSON backup for\nevery single node"]
-        K3["Property audit report\nflags anything unhandled"]
+        K1[ALL of the above +<br/>50+ property categories]
+        K2[Raw JSON backup for<br/>every single node]
+        K3[Property audit report<br/>flags anything unhandled]
     end
 
     style LOST fill:#D94452,color:#ffffff,stroke:#b52d3a,stroke-width:2px
@@ -544,9 +544,9 @@ Add to your project's `CLAUDE.md` to skip framework detection:
 figma-to-code/
 |
 |-- src/                              The extraction engine
-|   |-- figma-extract.js              Entry point — orchestrates all 6 steps
+|   |-- figma-extract.js              Entry point - orchestrates all 6 steps
 |   |-- api.js                        Figma REST API client
-|   |-- tree-walker.js                Analyzes hierarchy + chunks into ~10K pieces
+|   |-- tree-walker.js                Analyzes hierarchy + chunks into 10K pieces
 |   |-- component-detector.js         Finds reusable components
 |   |-- token-extractor.js            Extracts all design tokens
 |   |-- asset-exporter.js             Smart icon/image export (filters junk)
@@ -554,14 +554,14 @@ figma-to-code/
 |   |-- chunk-writer.js               Writes detailed per-component specs
 |
 |-- skills/figma-to-code/
-|   |-- SKILL.md                      The brain — 9 rules + 7 phases
+|   |-- SKILL.md                      The brain - 9 rules + 7 phases
 |   |-- references/
 |       |-- flutter.md                Flutter production patterns
 |       |-- react.md                  React/Next.js production patterns
 |       |-- react-native.md           React Native/Expo production patterns
 |
 |-- test/                             Unit tests
-|-- PLAN.md                           Architecture & design decisions
+|-- PLAN.md                           Architecture and design decisions
 |-- README.md                         This file
 ```
 
